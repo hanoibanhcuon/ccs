@@ -101,6 +101,12 @@ If you have both Claude subscription and GLM Coding Plan, you know the pain:
 
 ### One-Liner (Recommended)
 
+**Short URL** (via CloudFlare):
+```bash
+curl -fsSL kaitran.ca/ccs/install | bash
+```
+
+**Direct from GitHub**:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kaitranntt/ccs/main/install.sh | bash
 ```
@@ -137,6 +143,10 @@ cd ccs && git pull && ./install.sh
 
 **From curl install**:
 ```bash
+# Short URL
+curl -fsSL kaitran.ca/ccs/install | bash
+
+# Or direct from GitHub
 curl -fsSL https://raw.githubusercontent.com/kaitranntt/ccs/main/install.sh | bash
 ```
 
@@ -409,11 +419,21 @@ Error: Profile 'default' not found in ~/.ccs.json
 
 ## Uninstallation
 
+**Using installed command**:
 ```bash
 ccs-uninstall
 ```
 
-Or manual:
+**One-liner** (if ccs-uninstall not available):
+```bash
+# Short URL
+curl -fsSL kaitran.ca/ccs/uninstall | bash
+
+# Or direct from GitHub
+curl -fsSL https://raw.githubusercontent.com/kaitranntt/ccs/main/uninstall.sh | bash
+```
+
+**Manual**:
 ```bash
 rm ~/.local/bin/ccs
 rm ~/.local/bin/ccs-uninstall
