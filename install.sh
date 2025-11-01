@@ -141,7 +141,15 @@ create_sonnet_profile() {
   else
     echo "Creating Claude Sonnet profile template at $sonnet_settings"
     if [[ -f "$current_settings" ]] && command -v jq &> /dev/null; then
+      # Remove GLM-specific vars, but keep ANTHROPIC_DEFAULT_* if they contain "claude" (user preference)
+      # Filter logic assumes Claude model IDs contain "claude" substring (case-insensitive)
       if jq 'del(.env.ANTHROPIC_BASE_URL, .env.ANTHROPIC_AUTH_TOKEN, .env.ANTHROPIC_MODEL) |
+          .env |= with_entries(
+            select(
+              (.key | IN("ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL") | not) or
+              (.value | tostring? // "" | ascii_downcase | contains("claude"))
+            )
+          ) |
           if (.env | length) == 0 then .env = {} else . end' "$current_settings" > "$sonnet_settings.tmp" 2>/dev/null; then
         atomic_mv "$sonnet_settings.tmp" "$sonnet_settings"
       else
