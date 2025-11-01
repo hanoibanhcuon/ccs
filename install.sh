@@ -167,8 +167,7 @@ create_sonnet_profile() {
 
 # --- Main Installation ---
 
-echo "Installing ccs to $INSTALL_DIR..."
-echo ""
+echo "┌─ Installing CCS"
 
 # Create directories
 mkdir -p "$INSTALL_DIR" "$CCS_DIR"
@@ -181,23 +180,26 @@ if [[ "$INSTALL_METHOD" == "standalone" ]]; then
     exit 1
   fi
 
-  echo "Fetching ccs executable..."
   if curl -fsSL https://raw.githubusercontent.com/kaitranntt/ccs/main/ccs -o "$CCS_DIR/ccs"; then
     chmod +x "$CCS_DIR/ccs"
     ln -sf "$CCS_DIR/ccs" "$INSTALL_DIR/ccs"
+    echo "│  ✓ Downloaded executable"
   else
-    echo "❌ Error: Failed to download ccs from GitHub"
+    echo "│"
+    echo "✗ Error: Failed to download ccs from GitHub"
     exit 1
   fi
 else
   # Git install - use local ccs file
   chmod +x "$SCRIPT_DIR/ccs"
   ln -sf "$SCRIPT_DIR/ccs" "$INSTALL_DIR/ccs"
+  echo "│  ✓ Installed executable"
 fi
 
 if [[ ! -L "$INSTALL_DIR/ccs" ]]; then
-  echo "❌ Error: Failed to create symlink at $INSTALL_DIR/ccs"
-  echo "Check directory permissions and try again."
+  echo "│"
+  echo "✗ Error: Failed to create symlink at $INSTALL_DIR/ccs"
+  echo "  Check directory permissions and try again."
   exit 1
 fi
 
@@ -209,23 +211,17 @@ if [[ -f "$SCRIPT_DIR/uninstall.sh" ]]; then
   fi
   chmod +x "$CCS_DIR/uninstall.sh"
   ln -sf "$CCS_DIR/uninstall.sh" "$INSTALL_DIR/ccs-uninstall"
+  echo "│  ✓ Installed uninstaller"
 elif [[ "$INSTALL_METHOD" == "standalone" ]] && command -v curl &> /dev/null; then
-  echo "Fetching uninstall script..."
-  curl -fsSL https://raw.githubusercontent.com/kaitranntt/ccs/main/uninstall.sh -o "$CCS_DIR/uninstall.sh"
-  chmod +x "$CCS_DIR/uninstall.sh"
-  ln -sf "$CCS_DIR/uninstall.sh" "$INSTALL_DIR/ccs-uninstall"
+  if curl -fsSL https://raw.githubusercontent.com/kaitranntt/ccs/main/uninstall.sh -o "$CCS_DIR/uninstall.sh"; then
+    chmod +x "$CCS_DIR/uninstall.sh"
+    ln -sf "$CCS_DIR/uninstall.sh" "$INSTALL_DIR/ccs-uninstall"
+    echo "│  ✓ Installed uninstaller"
+  fi
 fi
 
-# Check PATH
-if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-  echo "⚠️  Warning: $INSTALL_DIR is not in PATH"
-  echo ""
-  echo "Add to your shell profile (~/.bashrc or ~/.zshrc):"
-  echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-  echo ""
-fi
-
-echo "✅ Installation complete!"
+echo "│  ✓ Created directories"
+echo "└─"
 echo ""
 
 # --- Profile Setup ---
@@ -234,20 +230,31 @@ CURRENT_PROVIDER=$(detect_current_provider)
 GLM_SETTINGS="$CCS_DIR/glm.settings.json"
 SONNET_SETTINGS="$CCS_DIR/sonnet.settings.json"
 
-[[ "$CURRENT_PROVIDER" != "unknown" ]] && echo "🔍 Detected current provider: $CURRENT_PROVIDER" && echo ""
+# Build provider label
+PROVIDER_LABEL=""
+[[ "$CURRENT_PROVIDER" == "glm" ]] && PROVIDER_LABEL=" (detected: GLM)"
+[[ "$CURRENT_PROVIDER" == "claude" ]] && PROVIDER_LABEL=" (detected: Claude)"
+[[ "$CURRENT_PROVIDER" == "custom" ]] && PROVIDER_LABEL=" (detected: custom)"
 
-# Create missing profiles
-if [[ ! -f "$GLM_SETTINGS" ]] || [[ ! -f "$SONNET_SETTINGS" ]]; then
-  echo "📝 Setup wizard: Creating profile files..."
-  echo ""
+echo "┌─ Configuring Profiles${PROVIDER_LABEL}"
 
-  [[ ! -f "$GLM_SETTINGS" ]] && create_glm_profile "$CURRENT_PROVIDER" && echo ""
-  [[ ! -f "$SONNET_SETTINGS" ]] && create_sonnet_profile "$CURRENT_PROVIDER" && echo ""
+# Track if GLM needs API key
+NEEDS_GLM_KEY=false
+
+# Create missing profiles (silently, show only result)
+if [[ ! -f "$GLM_SETTINGS" ]]; then
+  create_glm_profile "$CURRENT_PROVIDER" >/dev/null 2>&1
+  echo "│  ✓ GLM profile → ~/.ccs/glm.settings.json"
+  [[ "$CURRENT_PROVIDER" != "glm" ]] && NEEDS_GLM_KEY=true
+fi
+
+if [[ ! -f "$SONNET_SETTINGS" ]]; then
+  create_sonnet_profile "$CURRENT_PROVIDER" >/dev/null 2>&1
+  echo "│  ✓ Sonnet profile → ~/.ccs/sonnet.settings.json"
 fi
 
 # Create ccs config
 if [[ ! -f "$CCS_DIR/config.json" ]]; then
-  echo "Creating ~/.ccs/config.json..."
   cat > "$CCS_DIR/config.json.tmp" << 'EOF'
 {
   "profiles": {
@@ -258,18 +265,51 @@ if [[ ! -f "$CCS_DIR/config.json" ]]; then
 }
 EOF
   atomic_mv "$CCS_DIR/config.json.tmp" "$CCS_DIR/config.json"
-  echo "  ✓ Created: ~/.ccs/config.json"
+  echo "│  ✓ Config → ~/.ccs/config.json"
+fi
+
+echo "└─"
+echo ""
+
+# Check PATH warning
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+  echo "⚠  PATH Configuration Required"
+  echo ""
+  echo "   Add to your shell profile (~/.bashrc or ~/.zshrc):"
+  echo "     export PATH=\"\$HOME/.local/bin:\$PATH\""
   echo ""
 fi
 
-echo "✅ Setup complete!"
+# Show API key warning if needed
+if [[ "$NEEDS_GLM_KEY" == "true" ]]; then
+  echo "⚠  ACTION REQUIRED"
+  echo ""
+  echo "   Edit ~/.ccs/glm.settings.json and add your GLM API key"
+  echo "   Replace: YOUR_GLM_API_KEY_HERE"
+  echo ""
+fi
+
+echo "✅ CCS installed successfully!"
 echo ""
-echo "Quick start:"
+
+# Build quick start based on current provider
+if [[ "$CURRENT_PROVIDER" == "claude" ]]; then
+  echo "   Quick start:"
+  echo "     ccs son       # Claude Sonnet (current)"
+  echo "     ccs glm       # GLM (after adding API key)"
+  echo "     ccs           # Default profile"
+elif [[ "$CURRENT_PROVIDER" == "glm" ]]; then
+  echo "   Quick start:"
+  echo "     ccs glm       # GLM (current)"
+  echo "     ccs son       # Claude Sonnet"
+  echo "     ccs           # Default profile"
+else
+  echo "   Quick start:"
+  echo "     ccs           # Default profile"
+  echo "     ccs son       # Claude Sonnet"
+  echo "     ccs glm       # GLM (after adding API key)"
+fi
+
 echo ""
-echo "Example:"
-echo "  ccs           # Uses default profile"
-echo "  ccs glm       # Uses GLM profile"
-echo "  ccs son       # Uses Claude Sonnet profile"
-echo "  ccs son --verbose"
+echo "   To uninstall: ccs-uninstall"
 echo ""
-echo "To uninstall: ccs-uninstall"
