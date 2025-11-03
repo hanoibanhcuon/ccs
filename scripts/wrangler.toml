@@ -1,0 +1,7 @@
+name = "ccs-installer"
+main = "worker.js"
+compatibility_date = "2025-11-02"
+workers_dev = true
+
+# CloudFlare Worker configuration for CCS installer
+# This worker serves platform-specific installation scripts

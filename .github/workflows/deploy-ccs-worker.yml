@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/worker.js'
+      - 'scripts/wrangler.toml'
       - 'installers/**'
 
   # Allow manual trigger
@@ -25,4 +26,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: scripts
-          command: deploy worker.js --name ccs-installer
+          wranglerVersion: "4.45.3"
+          command: deploy
