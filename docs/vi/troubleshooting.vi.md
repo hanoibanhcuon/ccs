@@ -36,6 +36,194 @@ where.exe claude
 # Nếu thiếu, cài đặt từ tài liệu Claude
 ```
 
+## Claude CLI Ở Vị Trí Không Chuẩn
+
+Nếu Claude CLI được cài đặt trên ổ đĩa khác hoặc vị trí tùy chỉnh (phổ biến trên Windows với ổ D:):
+
+### Triệu Chứng
+```
+╔═════════════════════════════════════════════╗
+║  ERROR                                      ║
+╚═════════════════════════════════════════════╝
+
+Claude CLI not found
+
+Searched:
+  - CCS_CLAUDE_PATH: (not set)
+  - System PATH: not found
+  - Common locations: not found
+```
+
+### Giải Pháp: Đặt CCS_CLAUDE_PATH
+
+**Bước 1: Tìm Vị Trí Claude CLI**
+
+*Windows*:
+```powershell
+# Tìm kiếm tất cả ổ đĩa
+Get-ChildItem -Path C:\,D:\,E:\ -Filter claude.exe -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+
+# Các vị trí phổ biến cần kiểm tra thủ công
+D:\Program Files\Claude\claude.exe
+D:\Tools\Claude\claude.exe
+D:\Users\<Username>\AppData\Local\Claude\claude.exe
+```
+
+*Unix/Linux/macOS*:
+```bash
+# Tìm kiếm hệ thống
+sudo find / -name claude 2>/dev/null
+
+# Hoặc kiểm tra các vị trí cụ thể
+ls -la /usr/local/bin/claude
+ls -la ~/.local/bin/claude
+ls -la /opt/homebrew/bin/claude
+```
+
+**Bước 2: Đặt Biến Môi Trường**
+
+*Windows (PowerShell) - Vĩnh viễn*:
+```powershell
+# Thay bằng đường dẫn thực tế của bạn
+$ClaudePath = "D:\Program Files\Claude\claude.exe"
+
+# Đặt cho phiên hiện tại
+$env:CCS_CLAUDE_PATH = $ClaudePath
+
+# Đặt vĩnh viễn cho user
+[Environment]::SetEnvironmentVariable("CCS_CLAUDE_PATH", $ClaudePath, "User")
+
+# Khởi động lại terminal để áp dụng
+```
+
+*Unix (bash) - Vĩnh viễn*:
+```bash
+# Thay bằng đường dẫn thực tế của bạn
+CLAUDE_PATH="/opt/custom/location/claude"
+
+# Thêm vào shell profile
+echo "export CCS_CLAUDE_PATH=\"$CLAUDE_PATH\"" >> ~/.bashrc
+
+# Reload profile
+source ~/.bashrc
+```
+
+*Unix (zsh) - Vĩnh viễn*:
+```bash
+# Thay bằng đường dẫn thực tế của bạn
+CLAUDE_PATH="/opt/custom/location/claude"
+
+# Thêm vào shell profile
+echo "export CCS_CLAUDE_PATH=\"$CLAUDE_PATH\"" >> ~/.zshrc
+
+# Reload profile
+source ~/.zshrc
+```
+
+**Bước 3: Xác Minh Cấu Hình**
+
+```bash
+# Kiểm tra biến môi trường đã được đặt
+echo $CCS_CLAUDE_PATH        # Unix
+$env:CCS_CLAUDE_PATH         # Windows
+
+# Kiểm tra CCS có thể tìm thấy Claude
+ccs --version
+
+# Kiểm tra với profile thực tế
+ccs glm --version
+```
+
+### Các Vấn Đề Phổ Biến
+
+**Đường Dẫn Không Hợp Lệ**:
+```
+Error: File not found: D:\Program Files\Claude\claude.exe
+```
+
+**Sửa**: Kiểm tra kỹ đường dẫn, đảm bảo file tồn tại:
+```powershell
+Test-Path "D:\Program Files\Claude\claude.exe"  # Windows
+ls -la "/path/to/claude"                         # Unix
+```
+
+**Thư Mục Thay Vì File**:
+```
+Error: Path is a directory: D:\Program Files\Claude
+```
+
+**Sửa**: Đường dẫn phải trỏ đến file `claude.exe`, không phải thư mục:
+```powershell
+# Sai
+$env:CCS_CLAUDE_PATH = "D:\Program Files\Claude"
+
+# Đúng
+$env:CCS_CLAUDE_PATH = "D:\Program Files\Claude\claude.exe"
+```
+
+**Không Thể Thực Thi**:
+```
+Error: File is not executable: /path/to/claude
+```
+
+**Sửa** (chỉ Unix):
+```bash
+chmod +x /path/to/claude
+```
+
+### Cấu Hình Riêng Cho WSL
+
+Khi sử dụng Claude trên Windows từ WSL:
+
+```bash
+# Định dạng đường dẫn mount: /mnt/d/ cho ổ D:
+export CCS_CLAUDE_PATH="/mnt/d/Program Files/Claude/claude.exe"
+
+# Thêm vào ~/.bashrc để lưu
+echo 'export CCS_CLAUDE_PATH="/mnt/d/Program Files/Claude/claude.exe"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Lưu ý**: Khoảng trắng trong đường dẫn Windows hoạt động đúng từ WSL khi được quote đúng cách.
+
+### Debug Phát Hiện
+
+Để xem CCS đã kiểm tra gì:
+
+```bash
+# Tạm thời di chuyển claude ra khỏi PATH để kiểm tra
+# Sau đó chạy ccs - thông báo lỗi sẽ hiển thị những gì đã được kiểm tra
+
+ccs --version
+# Sẽ hiển thị:
+#   - CCS_CLAUDE_PATH: (status)
+#   - System PATH: not found
+#   - Common locations: not found
+```
+
+### Phương Án Thay Thế: Thêm Vào PATH
+
+Nếu bạn không muốn dùng CCS_CLAUDE_PATH, thêm thư mục Claude vào PATH:
+
+*Windows (PowerShell)*:
+```powershell
+# Thêm D:\Program Files\Claude vào PATH
+$ClaudeDir = "D:\Program Files\Claude"
+$env:Path += ";$ClaudeDir"
+[Environment]::SetEnvironmentVariable("Path", $env:Path, "User")
+
+# Khởi động lại terminal
+```
+
+*Unix (bash)*:
+```bash
+# Thêm /opt/claude/bin vào PATH
+echo 'export PATH="/opt/claude/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Lưu ý**: CCS_CLAUDE_PATH có ưu tiên cao hơn PATH, cho phép ghi đè cho từng dự án.
+
 ## Vấn Đề Cài Đặt
 
 ### Lỗi BASH_SOURCE unbound variable

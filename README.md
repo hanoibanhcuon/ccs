@@ -67,6 +67,17 @@ ccs "Write unit tests"
 }
 ```
 
+### Custom Claude CLI Path
+
+If Claude CLI is installed in a non-standard location (D drive, custom directory), set `CCS_CLAUDE_PATH`:
+
+```bash
+export CCS_CLAUDE_PATH="/path/to/claude"              # Unix
+$env:CCS_CLAUDE_PATH = "D:\Tools\Claude\claude.exe"   # Windows
+```
+
+**See [Troubleshooting Guide](./docs/troubleshooting.md#claude-cli-in-non-standard-location) for detailed setup instructions.**
+
 ---
 
 ## The Daily Developer Pain Point

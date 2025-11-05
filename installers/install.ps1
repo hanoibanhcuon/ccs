@@ -30,7 +30,7 @@ $InstallMethod = if ($ScriptDir -and ((Test-Path "$ScriptDir\ccs.ps1") -or (Test
 # IMPORTANT: Update this version when releasing new versions!
 # This hardcoded version is used for standalone installations (irm | iex)
 # For git installations, VERSION file is read if available
-$CcsVersion = "2.2.3"
+$CcsVersion = "2.3.0"
 
 # Try to read VERSION file for git installations
 if ($ScriptDir) {
@@ -371,7 +371,8 @@ if ($UserPath -notlike "*$CcsDir*") {
 
 # Show API key warning if needed
 if ($NeedsGlmKey) {
-    Write-Critical "Configure GLM API Key:
+    Write-Critical @"
+Configure GLM API Key:
 
     1. Get API key from: https://api.z.ai
 
@@ -380,7 +381,8 @@ if ($NeedsGlmKey) {
     3. Replace: YOUR_GLM_API_KEY_HERE
        With your actual API key
 
-    4. Test: ccs glm --version"
+    4. Test: ccs glm --version
+"@
 }
 
 Write-Success "CCS installed successfully!"

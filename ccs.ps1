@@ -24,8 +24,142 @@ function Write-ErrorMsg {
     Write-Host ""
 }
 
+# --- Claude CLI Detection Logic ---
+
+function Find-ClaudeCli {
+    [OutputType([string])]
+    param()
+
+    # Priority 1: CCS_CLAUDE_PATH environment variable
+    $CcsClaudePath = $env:CCS_CLAUDE_PATH
+    if ($CcsClaudePath) {
+        if ((Test-Path $CcsClaudePath -PathType Leaf) -and
+            (Get-Command $CcsClaudePath -ErrorAction SilentlyContinue)) {
+            return $CcsClaudePath
+        }
+        # Invalid CCS_CLAUDE_PATH - continue to fallbacks
+        # Warning will be shown later in validation phase
+    }
+
+    # Priority 2: Check if claude in PATH
+    $ClaudeInPath = Get-Command claude -ErrorAction SilentlyContinue
+    if ($ClaudeInPath) {
+        return $ClaudeInPath.Source
+    }
+
+    # Priority 3: Check common installation locations
+    $CommonLocations = @(
+        "$env:LOCALAPPDATA\Claude\claude.exe",
+        "$env:PROGRAMFILES\Claude\claude.exe",
+        "C:\Program Files\Claude\claude.exe",
+        "D:\Program Files\Claude\claude.exe",
+        "$env:USERPROFILE\.local\bin\claude.exe"
+    )
+
+    foreach ($Location in $CommonLocations) {
+        $ExpandedPath = [System.Environment]::ExpandEnvironmentVariables($Location)
+        if ((Test-Path $ExpandedPath -PathType Leaf) -and
+            (Get-Command $ExpandedPath -ErrorAction SilentlyContinue)) {
+            return $ExpandedPath
+        }
+    }
+
+    # Not found
+    return ""
+}
+
+function Test-ClaudeCli {
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory=$true)]
+        [AllowEmptyString()]
+        [string]$Path
+    )
+
+    # Check 1: Empty path
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "No path provided"
+    }
+
+    # Check 2: File exists
+    if (-not (Test-Path $Path)) {
+        throw "File not found: $Path"
+    }
+
+    # Check 3: Is regular file (not directory)
+    if (Test-Path $Path -PathType Container) {
+        throw "Path is a directory: $Path"
+    }
+
+    # Check 4: Is executable (Get-Command can load it)
+    try {
+        $null = Get-Command $Path -ErrorAction Stop
+    } catch {
+        throw "File is not executable: $Path`n`nCheck file permissions and file type"
+    }
+
+    # Check 5: Path safety (prevent injection)
+    # Allow: alphanumeric, \, /, :, space, -, _, ., ~
+    if ($Path -match '[;|&<>`$*?\[\]''"()]') {
+        throw "Path contains unsafe characters: $Path`n`nAllowed: alphanumeric, path separators, spaces, hyphens, underscores, dots"
+    }
+
+    # All checks passed
+    return $true
+}
+
+function Show-ClaudeNotFoundError {
+    $EnvVarStatus = if ($env:CCS_CLAUDE_PATH) { $env:CCS_CLAUDE_PATH } else { "(not set)" }
+
+    Write-ErrorMsg @"
+Claude CLI not found
+
+Searched:
+  - CCS_CLAUDE_PATH: $EnvVarStatus
+  - System PATH: not found
+  - Common locations: not found
+
+Solutions:
+  1. Add Claude CLI to PATH:
+
+     # Find where Claude is installed
+     Get-ChildItem -Path C:\,D:\ -Filter claude.exe -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+
+     # Then add to PATH (replace with actual path)
+     `$env:Path += ';D:\path\to\claude\directory'
+     [Environment]::SetEnvironmentVariable('Path', `$env:Path, 'User')
+
+     # Restart terminal for changes to take effect
+
+  2. Or set custom path:
+
+     `$env:CCS_CLAUDE_PATH = 'D:\full\path\to\claude.exe'
+     [Environment]::SetEnvironmentVariable('CCS_CLAUDE_PATH', 'D:\full\path\to\claude.exe', 'User')
+
+     Example (D drive installation):
+       `$env:CCS_CLAUDE_PATH = 'D:\Tools\Claude\claude.exe'
+       [Environment]::SetEnvironmentVariable('CCS_CLAUDE_PATH', 'D:\Tools\Claude\claude.exe', 'User')
+
+     # Restart terminal for changes to take effect
+
+  3. Or install Claude CLI:
+
+     https://docs.claude.com/en/docs/claude-code/installation
+
+Verify installation:
+  ccs --version
+
+Debugging:
+  # Check if claude command exists
+  Get-Command claude -ErrorAction SilentlyContinue
+
+  # Check CCS_CLAUDE_PATH
+  `$env:CCS_CLAUDE_PATH
+"@
+}
+
 # Version (updated by scripts/bump-version.sh)
-$CcsVersion = "2.2.3"
+$CcsVersion = "2.3.0"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Installation function for commands and skills
@@ -57,7 +191,8 @@ function Install-CommandsAndSkills {
         Write-Host "|"
         $DevelopmentPath = Join-Path $ScriptDir ".claude"
         $InstalledPath = Join-Path $env:USERPROFILE ".ccs\.claude"
-        Write-ErrorMsg "Source directory not found.
+        Write-ErrorMsg @"
+Source directory not found.
 
 Checked locations:
   - $DevelopmentPath (development)
@@ -65,7 +200,8 @@ Checked locations:
 
 Solution:
   1. If developing: Ensure you're in the CCS repository
-  2. If installed: Reinstall CCS with: irm ccs.kaitran.ca/install | iex"
+  2. If installed: Reinstall CCS with: irm ccs.kaitran.ca/install | iex
+"@
         exit 1
     }
 
@@ -246,11 +382,26 @@ if ($FirstArg -eq "version" -or $FirstArg -eq "--version" -or $FirstArg -eq "-v"
 
 # Special case: help command (check BEFORE profile detection)
 if ($FirstArg -eq "--help" -or $FirstArg -eq "-h" -or $FirstArg -eq "help") {
+    # Detect and validate Claude CLI for help command
+    $ClaudeCli = Find-ClaudeCli
+
+    if ([string]::IsNullOrEmpty($ClaudeCli)) {
+        Show-ClaudeNotFoundError
+        exit 1
+    }
+
+    try {
+        $null = Test-ClaudeCli -Path $ClaudeCli
+    } catch {
+        Write-ErrorMsg $_.Exception.Message
+        exit 1
+    }
+
     try {
         if ($RemainingArgs) {
-            & claude --help @RemainingArgs
+            & $ClaudeCli --help @RemainingArgs
         } else {
-            & claude --help
+            & $ClaudeCli --help
         }
         exit $LASTEXITCODE
     } catch {
@@ -313,7 +464,8 @@ $ConfigFile = if ($env:CCS_CONFIG) {
 
 # Check config exists
 if (-not (Test-Path $ConfigFile)) {
-    Write-ErrorMsg "Config file not found: $ConfigFile
+    Write-ErrorMsg @"
+Config file not found: $ConfigFile
 
 Solutions:
   1. Reinstall CCS:
@@ -322,19 +474,22 @@ Solutions:
   2. Or create config manually:
      New-Item -ItemType Directory -Force -Path '$env:USERPROFILE\.ccs'
      Set-Content -Path '$env:USERPROFILE\.ccs\config.json' -Value '{
-       ""profiles"": {
-         ""glm"": ""~/.ccs/glm.settings.json"",
-         ""default"": ""~/.claude/settings.json""
+       "profiles": {
+         "glm": "~/.ccs/glm.settings.json",
+         "default": "~/.claude/settings.json"
        }
-     }'"
+     }'
+"@
     exit 1
 }
 
 # Validate profile name (alphanumeric, dash, underscore only)
 if ($Profile -notmatch '^[a-zA-Z0-9_-]+$') {
-    Write-ErrorMsg "Invalid profile name: $Profile
+    Write-ErrorMsg @"
+Invalid profile name: $Profile
 
-Use only alphanumeric characters, dash, or underscore."
+Use only alphanumeric characters, dash, or underscore.
+"@
     exit 1
 }
 
@@ -343,20 +498,24 @@ try {
     $ConfigContent = Get-Content $ConfigFile -Raw -ErrorAction Stop
     $Config = $ConfigContent | ConvertFrom-Json -ErrorAction Stop
 } catch {
-    Write-ErrorMsg "Invalid JSON in $ConfigFile
+    Write-ErrorMsg @"
+Invalid JSON in $ConfigFile
 
 Fix the JSON syntax or reinstall:
-  irm ccs.kaitran.ca/install | iex"
+  irm ccs.kaitran.ca/install | iex
+"@
     exit 1
 }
 
 # Validate config has profiles object
 if (-not $Config.profiles) {
-    Write-ErrorMsg "Config must have 'profiles' object
+    Write-ErrorMsg @"
+Config must have 'profiles' object
 
 See .ccs.example.json for correct format
 Or reinstall:
-  irm ccs.kaitran.ca/install | iex"
+  irm ccs.kaitran.ca/install | iex
+"@
     exit 1
 }
 
@@ -365,10 +524,12 @@ $SettingsPath = $Config.profiles.$Profile
 
 if (-not $SettingsPath) {
     $AvailableProfiles = ($Config.profiles.PSObject.Properties.Name | ForEach-Object { "  - $_" }) -join "`n"
-    Write-ErrorMsg "Profile '$Profile' not found in $ConfigFile
+    Write-ErrorMsg @"
+Profile '$Profile' not found in $ConfigFile
 
 Available profiles:
-$AvailableProfiles"
+$AvailableProfiles
+"@
     exit 1
 }
 
@@ -386,12 +547,14 @@ $SettingsPath = $SettingsPath -replace '/', '\'
 
 # Validate settings file exists
 if (-not (Test-Path $SettingsPath)) {
-    Write-ErrorMsg "Settings file not found: $SettingsPath
+    Write-ErrorMsg @"
+Settings file not found: $SettingsPath
 
 Solutions:
   1. Create the settings file for profile '$Profile'
   2. Update the path in $ConfigFile
-  3. Or reinstall: irm ccs.kaitran.ca/install | iex"
+  3. Or reinstall: irm ccs.kaitran.ca/install | iex
+"@
     exit 1
 }
 
@@ -400,7 +563,8 @@ try {
     $SettingsContent = Get-Content $SettingsPath -Raw -ErrorAction Stop
     $Settings = $SettingsContent | ConvertFrom-Json -ErrorAction Stop
 } catch {
-    Write-ErrorMsg "Invalid JSON in $SettingsPath
+    Write-ErrorMsg @"
+Invalid JSON in $SettingsPath
 
 Details: $_
 
@@ -408,16 +572,33 @@ Solutions:
   1. Validate JSON at https://jsonlint.com
   2. Or reset to template:
      Set-Content -Path '$SettingsPath' -Value '{`"env`":{}}`'
-  3. Or reinstall: irm ccs.kaitran.ca/install | iex"
+  3. Or reinstall: irm ccs.kaitran.ca/install | iex
+"@
     exit 1
 }
 
-# Execute claude with settings file (using --settings flag)
+# Detect Claude CLI executable
+$ClaudeCli = Find-ClaudeCli
+
+if ([string]::IsNullOrEmpty($ClaudeCli)) {
+    Show-ClaudeNotFoundError
+    exit 1
+}
+
+# Validate detected path
+try {
+    $null = Test-ClaudeCli -Path $ClaudeCli
+} catch {
+    Write-ErrorMsg $_.Exception.Message
+    exit 1
+}
+
+# Execute with validated path
 try {
     if ($RemainingArgs) {
-        & claude --settings $SettingsPath @RemainingArgs
+        & $ClaudeCli --settings $SettingsPath @RemainingArgs
     } else {
-        & claude --settings $SettingsPath
+        & $ClaudeCli --settings $SettingsPath
     }
     exit $LASTEXITCODE
 } catch {

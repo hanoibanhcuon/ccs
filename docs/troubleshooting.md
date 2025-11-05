@@ -36,6 +36,194 @@ where.exe claude
 # If missing, install from Claude docs
 ```
 
+## Claude CLI in Non-Standard Location
+
+If Claude CLI is installed on a different drive or custom location (common on Windows systems with D: drives):
+
+### Symptoms
+```
+╔═════════════════════════════════════════════╗
+║  ERROR                                      ║
+╚═════════════════════════════════════════════╝
+
+Claude CLI not found
+
+Searched:
+  - CCS_CLAUDE_PATH: (not set)
+  - System PATH: not found
+  - Common locations: not found
+```
+
+### Solution: Set CCS_CLAUDE_PATH
+
+**Step 1: Find Claude CLI Location**
+
+*Windows*:
+```powershell
+# Search all drives
+Get-ChildItem -Path C:\,D:\,E:\ -Filter claude.exe -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+
+# Common locations to check manually
+D:\Program Files\Claude\claude.exe
+D:\Tools\Claude\claude.exe
+D:\Users\<Username>\AppData\Local\Claude\claude.exe
+```
+
+*Unix/Linux/macOS*:
+```bash
+# Search system
+sudo find / -name claude 2>/dev/null
+
+# Or check specific locations
+ls -la /usr/local/bin/claude
+ls -la ~/.local/bin/claude
+ls -la /opt/homebrew/bin/claude
+```
+
+**Step 2: Set Environment Variable**
+
+*Windows (PowerShell) - Permanent*:
+```powershell
+# Replace with your actual path
+$ClaudePath = "D:\Program Files\Claude\claude.exe"
+
+# Set for current session
+$env:CCS_CLAUDE_PATH = $ClaudePath
+
+# Set permanently for user
+[Environment]::SetEnvironmentVariable("CCS_CLAUDE_PATH", $ClaudePath, "User")
+
+# Restart terminal to apply
+```
+
+*Unix (bash) - Permanent*:
+```bash
+# Replace with your actual path
+CLAUDE_PATH="/opt/custom/location/claude"
+
+# Add to shell profile
+echo "export CCS_CLAUDE_PATH=\"$CLAUDE_PATH\"" >> ~/.bashrc
+
+# Reload profile
+source ~/.bashrc
+```
+
+*Unix (zsh) - Permanent*:
+```bash
+# Replace with your actual path
+CLAUDE_PATH="/opt/custom/location/claude"
+
+# Add to shell profile
+echo "export CCS_CLAUDE_PATH=\"$CLAUDE_PATH\"" >> ~/.zshrc
+
+# Reload profile
+source ~/.zshrc
+```
+
+**Step 3: Verify Configuration**
+
+```bash
+# Check environment variable is set
+echo $CCS_CLAUDE_PATH        # Unix
+$env:CCS_CLAUDE_PATH         # Windows
+
+# Test CCS can find Claude
+ccs --version
+
+# Test with actual profile
+ccs glm --version
+```
+
+### Common Issues
+
+**Invalid Path**:
+```
+Error: File not found: D:\Program Files\Claude\claude.exe
+```
+
+**Fix**: Double-check path, ensure file exists:
+```powershell
+Test-Path "D:\Program Files\Claude\claude.exe"  # Windows
+ls -la "/path/to/claude"                         # Unix
+```
+
+**Directory Instead of File**:
+```
+Error: Path is a directory: D:\Program Files\Claude
+```
+
+**Fix**: Path must point to `claude.exe` file, not directory:
+```powershell
+# Wrong
+$env:CCS_CLAUDE_PATH = "D:\Program Files\Claude"
+
+# Right
+$env:CCS_CLAUDE_PATH = "D:\Program Files\Claude\claude.exe"
+```
+
+**Not Executable**:
+```
+Error: File is not executable: /path/to/claude
+```
+
+**Fix** (Unix only):
+```bash
+chmod +x /path/to/claude
+```
+
+### WSL-Specific Configuration
+
+When using Windows Claude from WSL:
+
+```bash
+# Mount path format: /mnt/d/ for D: drive
+export CCS_CLAUDE_PATH="/mnt/d/Program Files/Claude/claude.exe"
+
+# Add to ~/.bashrc for persistence
+echo 'export CCS_CLAUDE_PATH="/mnt/d/Program Files/Claude/claude.exe"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Note**: Spaces in Windows paths work correctly from WSL when quoted properly.
+
+### Debugging Detection
+
+To see what CCS checked:
+
+```bash
+# Temporarily move claude out of PATH to test
+# Then run ccs - error message shows what was checked
+
+ccs --version
+# Will show:
+#   - CCS_CLAUDE_PATH: (status)
+#   - System PATH: not found
+#   - Common locations: not found
+```
+
+### Alternative: Add to PATH Instead
+
+If you prefer not using CCS_CLAUDE_PATH, add Claude directory to PATH:
+
+*Windows (PowerShell)*:
+```powershell
+# Add D:\Program Files\Claude to PATH
+$ClaudeDir = "D:\Program Files\Claude"
+$env:Path += ";$ClaudeDir"
+[Environment]::SetEnvironmentVariable("Path", $env:Path, "User")
+
+# Restart terminal
+```
+
+*Unix (bash)*:
+```bash
+# Add /opt/claude/bin to PATH
+echo 'export PATH="/opt/claude/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Note**: CCS_CLAUDE_PATH takes priority over PATH, allowing per-project overrides.
+
 ## Installation Issues
 
 ### BASH_SOURCE unbound variable error

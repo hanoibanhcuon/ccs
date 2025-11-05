@@ -67,6 +67,17 @@ ccs "Viết unit tests"
 }
 ```
 
+### Đường Dẫn Claude CLI Tùy Chỉnh
+
+Nếu Claude CLI được cài đặt ở vị trí không chuẩn (ổ D, thư mục tùy chỉnh), đặt `CCS_CLAUDE_PATH`:
+
+```bash
+export CCS_CLAUDE_PATH="/path/to/claude"              # Unix
+$env:CCS_CLAUDE_PATH = "D:\Tools\Claude\claude.exe"   # Windows
+```
+
+**Xem [Hướng dẫn Khắc phục Sự cố](./docs/vi/troubleshooting.vi.md#claude-cli-ở-vị-trí-không-chuẩn) để biết chi tiết cài đặt.**
+
 ---
 
 ## Điểm Đau Hàng Ngày Của Lập Trình Viên
@@ -217,11 +228,11 @@ irm ccs.kaitran.ca/uninstall | iex
 ## 📖 Tài Liệu
 
 **Tài liệu đầy đủ trong [docs/](./docs/)**:
-- [Hướng dẫn Cài đặt](./docs/installation.md)
-- [Cấu hình](./docs/configuration.md)
-- [Ví dụ Sử dụng](./docs/usage.md)
-- [Khắc phục Sự cố](./docs/troubleshooting.md)
-- [Đóng góp](./docs/contributing.md)
+- [Hướng dẫn Cài đặt](./docs/vi/installation.vi.md)
+- [Cấu hình](./docs/vi/configuration.vi.md)
+- [Ví dụ Sử dụng](./docs/vi/usage.vi.md)
+- [Khắc phục Sự cố](./docs/vi/troubleshooting.vi.md) 
+- [Đóng góp](./docs/vi/contributing.vi.md)
 
 ---
 
