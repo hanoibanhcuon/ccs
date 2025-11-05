@@ -19,8 +19,20 @@ function getSpawnOptions(claudePath) {
 
   return {
     stdio: 'inherit',
-    shell: needsShell  // Required for .cmd files on Windows
+    shell: needsShell,
+    windowsHide: true  // Hide the console window on Windows
   };
+}
+
+// Helper: Escape arguments for shell execution to prevent security vulnerabilities
+function escapeShellArg(arg) {
+  if (process.platform !== 'win32') {
+    // Unix-like systems: escape single quotes and wrap in single quotes
+    return "'" + arg.replace(/'/g, "'\"'\"'") + "'";
+  } else {
+    // Windows: escape double quotes and wrap in double quotes
+    return '"' + arg.replace(/"/g, '""') + '"';
+  }
 }
 
 // Special command handlers
@@ -48,7 +60,17 @@ function handleHelpCommand(remainingArgs) {
 
   // Execute claude --help
   const spawnOpts = getSpawnOptions(claudeCli);
-  const child = spawn(claudeCli, ['--help', ...remainingArgs], spawnOpts);
+  let claudeArgs, child;
+
+  if (spawnOpts.shell) {
+    // When shell is required, escape arguments properly
+    claudeArgs = [claudeCli, '--help', ...remainingArgs].map(escapeShellArg).join(' ');
+    child = spawn(claudeArgs, spawnOpts);
+  } else {
+    // When no shell needed, use arguments array directly
+    claudeArgs = ['--help', ...remainingArgs];
+    child = spawn(claudeCli, claudeArgs, spawnOpts);
+  }
 
   child.on('exit', (code, signal) => {
     if (signal) {
@@ -138,7 +160,17 @@ function main() {
 
     // Execute claude with args
     const spawnOpts = getSpawnOptions(claudeCli);
-    const child = spawn(claudeCli, remainingArgs, spawnOpts);
+    let claudeArgs, child;
+
+    if (spawnOpts.shell) {
+      // When shell is required, escape arguments properly
+      claudeArgs = [claudeCli, ...remainingArgs].map(escapeShellArg).join(' ');
+      child = spawn(claudeArgs, spawnOpts);
+    } else {
+      // When no shell needed, use arguments array directly
+      claudeArgs = remainingArgs;
+      child = spawn(claudeCli, claudeArgs, spawnOpts);
+    }
 
     child.on('exit', (code, signal) => {
       if (signal) {
@@ -169,9 +201,19 @@ function main() {
   }
 
   // Execute claude with --settings
-  const claudeArgs = ['--settings', settingsPath, ...remainingArgs];
+  const claudeArgsList = ['--settings', settingsPath, ...remainingArgs];
   const spawnOpts = getSpawnOptions(claudeCli);
-  const child = spawn(claudeCli, claudeArgs, spawnOpts);
+  let claudeArgs, child;
+
+  if (spawnOpts.shell) {
+    // When shell is required, escape arguments properly
+    claudeArgs = [claudeCli, ...claudeArgsList].map(escapeShellArg).join(' ');
+    child = spawn(claudeArgs, spawnOpts);
+  } else {
+    // When no shell needed, use arguments array directly
+    claudeArgs = claudeArgsList;
+    child = spawn(claudeCli, claudeArgs, spawnOpts);
+  }
 
   child.on('exit', (code, signal) => {
     if (signal) {

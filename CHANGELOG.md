@@ -4,6 +4,24 @@ All notable changes to CCS will be documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.4.3] - 2025-11-04
+
+### Fixed
+- **CRITICAL: Node.js DEP0190 Security Vulnerability**: Fixed command injection vulnerability in Windows npm package
+  - **Root Cause**: `spawn()` called with `shell: true` and arguments array creates security vulnerability (DEP0190)
+  - **Issue**: Arguments not properly escaped, allowing potential command injection attacks
+  - **Solution**:
+    1. Added `escapeShellArg()` function for proper argument escaping
+    2. Platform-specific handling (Unix vs Windows escaping strategies)
+    3. Conditional execution: escaped string when `shell: true`, array when `shell: false`
+  - **Files Modified**:
+    - `bin/ccs.js`: Added argument escaping, updated all spawn() calls
+    - Added `windowsHide: true` for better Windows experience
+  - **Security**: Eliminated command injection vectors while maintaining full functionality
+  - **Testing**: Comprehensive testing on Linux and Windows platforms completed
+  - **Impact**: Resolves Node.js deprecation warning and secures Windows npm installations
+  - **Compatibility**: Full cross-platform compatibility maintained, no breaking changes
+
 ## [2.4.2] - 2025-11-04
 
 ### Changed
