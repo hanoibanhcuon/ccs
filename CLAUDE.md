@@ -34,6 +34,7 @@ The tool does ONE thing: map profile names to Claude settings files. Never add f
 
 ## Architecture
 
+**Core Flow** (common to both npm and traditional install):
 ```
 User: ccs [profile] [claude-args]
   ↓
@@ -43,33 +44,61 @@ Lookup profile → settings file path
   ↓
 Validate settings file exists
   ↓
-exec claude --settings <path> [args]
+Execute: claude --settings <path> [args]
 ```
 
+**Implementation Variants**:
+- **npm package**: Pure Node.js (bin/ccs.js) using child_process.spawn
+- **Traditional install**: Platform-specific bash (lib/ccs) or PowerShell (lib/ccs.ps1)
+
 **Key Files**:
-- `package.json`: npm package manifest with bin field configuration
+- `package.json`: npm package manifest with bin field configuration and postinstall script
 - `bin/ccs.js`: Cross-platform Node.js entry point (npm package)
+- `scripts/postinstall.js`: Auto-creates config files during npm install (idempotent)
 - `lib/ccs` (bash) / `lib/ccs.ps1` (PowerShell): Platform-specific executable wrappers
 - `installers/install.sh` / `installers/install.ps1`: Traditional installation scripts
 - `installers/uninstall.sh` / `installers/uninstall.ps1`: Removal scripts
 - `VERSION`: Single source of truth for version (format: MAJOR.MINOR.PATCH)
 - `.claude/`: Commands and skills for Claude Code integration
 
-**npm Package Architecture**:
+**npm Package Architecture** (Pure Node.js):
 ```
+npm install -g @kaitranntt/ccs
+  ↓
+npm runs postinstall: scripts/postinstall.js
+  ├─ Create ~/.ccs/ directory
+  ├─ Create config.json (if missing)
+  └─ Create glm.settings.json (if missing)
+  ↓
+npm creates ccs command (symlink to bin/ccs.js)
+  ↓
 User: ccs [profile] [claude-args]
   ↓
-npm creates bin/ccs.js symlink/wrapper
+bin/ccs.js (pure Node.js, cross-platform):
+  ├─ Parse arguments and detect profile
+  ├─ Read ~/.ccs/config.json (via config-manager.js)
+  ├─ Get settings path for profile
+  ├─ Detect claude CLI location (via claude-detector.js)
+  └─ spawn('claude', ['--settings', settingsPath, ...args])
+```
+
+**Traditional Installer Architecture** (Bash/PowerShell):
+```
+curl -fsSL ccs.kaitran.ca/install | bash  # or irm install | iex
   ↓
-bin/ccs.js detects platform (Unix vs Windows)
-  ├─ Unix: spawn bash lib/ccs [args]
-  └─ Windows: spawn pwsh/powershell lib/ccs.ps1 [args]
+installers/install.sh (or install.ps1)
+  ├─ Create ~/.ccs/ directory
+  ├─ Copy lib/ccs (or lib/ccs.ps1)
+  ├─ Create config.json
+  ├─ Create glm.settings.json
+  └─ Create symlink ~/.local/bin/ccs → ~/.ccs/ccs
   ↓
-Read ~/.ccs/config.json
+User: ccs [profile] [claude-args]
   ↓
-Lookup profile → settings file path
-  ↓
-exec claude --settings <path> [args]
+lib/ccs (bash) or lib/ccs.ps1 (PowerShell):
+  ├─ Read ~/.ccs/config.json (jq or ConvertFrom-Json)
+  ├─ Get settings path for profile
+  └─ exec claude --settings <path> [args]
 ```
 
 **Installation Creates**:

@@ -30,6 +30,17 @@ claude /login
 
 ### Phương Pháp Cài Đặt Chính
 
+#### Option 1: npm Package (Được khuyến nghị)
+
+**macOS / Linux / Windows**
+```bash
+npm install -g @kaitranntt/ccs
+```
+
+Tương thích với các trình quản lý package npm, yarn, pnpm, và bun.
+
+#### Option 2: Cài Đặt Trực Tiếp (Truyền thống)
+
 **macOS / Linux**
 ```bash
 curl -fsSL ccs.kaitran.ca/install | bash
@@ -55,7 +66,27 @@ ccs "Debug issue này"
 ccs "Viết unit tests"
 ```
 
+#### Package Manager Options
+
+Tất cả các trình quản lý package chính đều được hỗ trợ:
+
+```bash
+# npm (mặc định)
+npm install -g @kaitranntt/ccs
+
+# yarn
+yarn global add @kaitranntt/ccs
+
+# pnpm (ít hơn 70% dung lượng đĩa)
+pnpm add -g @kaitranntt/ccs
+
+# bun (nhanh hơn 30x)
+bun add -g @kaitranntt/ccs
+```
+
 ### Cấu Hình (Tự Tạo)
+
+**CCS tự động tạo cấu hình trong quá trình cài đặt** (thông qua script postinstall của npm).
 
 **~/.ccs/config.json**:
 ```json
@@ -228,17 +259,17 @@ irm ccs.kaitran.ca/uninstall | iex
 ## 📖 Tài Liệu
 
 **Tài liệu đầy đủ trong [docs/](./docs/)**:
-- [Hướng dẫn Cài đặt](./docs/vi/installation.vi.md)
-- [Cấu hình](./docs/vi/configuration.vi.md)
-- [Ví dụ Sử dụng](./docs/vi/usage.vi.md)
-- [Khắc phục Sự cố](./docs/vi/troubleshooting.vi.md) 
-- [Đóng góp](./docs/vi/contributing.vi.md)
+- [Hướng dẫn Cài đặt](./docs/installation.md)
+- [Cấu hình](./docs/configuration.md)
+- [Ví dụ Sử dụng](./docs/usage.md)
+- [Khắc phục Sự cố](./docs/troubleshooting.md)
+- [Đóng góp](./docs/contributing.md)
 
 ---
 
 ## 🤝 Đóng Góp
 
-Chúng tôi chào mừng đóng góp! Xem [Hướng dẫn Đóng góp](./docs/contributing.md) để biết chi tiết.
+Chúng tôi chào mừng đóng góp! Vui lòng xem [Hướng dẫn Đóng góp](./docs/contributing.md) để biết chi tiết.
 
 ---
 

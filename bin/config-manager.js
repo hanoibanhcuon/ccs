@@ -20,10 +20,13 @@ function readConfig() {
     showError(`Config file not found: ${configPath}
 
 Solutions:
-  1. Reinstall CCS:
+  1. Reinstall CCS (auto-creates config):
+     npm install -g @kaitranntt/ccs --force
+
+  2. Or use traditional installer:
      ${isWindows ? 'irm ccs.kaitran.ca/install | iex' : 'curl -fsSL ccs.kaitran.ca/install | bash'}
 
-  2. Or create config manually:
+  3. Or create manually:
      mkdir -p ~/.ccs
      cat > ~/.ccs/config.json << 'EOF'
 {
@@ -32,7 +35,10 @@ Solutions:
     "default": "~/.claude/settings.json"
   }
 }
-EOF`);
+EOF
+
+  Note: If you installed with npm --ignore-scripts, configs weren't created.
+        Reinstall without that flag: npm install -g @kaitranntt/ccs --force`);
     process.exit(1);
   }
 

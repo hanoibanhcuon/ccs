@@ -1,5 +1,45 @@
 # CCS Troubleshooting Guide
 
+## npm Installation Issues
+
+### Config File Not Found After npm Install
+
+**Symptom**: After `npm install -g @kaitranntt/ccs`, running `ccs --version` shows error:
+```
+Config file not found: /home/user/.ccs/config.json
+```
+
+**Cause**: You may have installed with `--ignore-scripts` flag, which skips the postinstall script that creates config files.
+
+**Solution**:
+```bash
+# Reinstall without --ignore-scripts
+npm install -g @kaitranntt/ccs --force
+
+# Or manually run postinstall
+node $(npm root -g)/@kaitranntt/ccs/scripts/postinstall.js
+
+# Or use traditional installer
+curl -fsSL ccs.kaitran.ca/install | bash  # macOS/Linux
+irm ccs.kaitran.ca/install | iex           # Windows
+```
+
+**Verify**:
+```bash
+ls -la ~/.ccs/
+# Should show: config.json, glm.settings.json
+```
+
+### Check npm ignore-scripts Setting
+
+```bash
+# Check if ignore-scripts is enabled
+npm config get ignore-scripts
+
+# If true, disable it (or use --force on install)
+npm config set ignore-scripts false
+```
+
 ## Windows-Specific Issues
 
 ### PowerShell Execution Policy

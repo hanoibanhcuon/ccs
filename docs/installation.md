@@ -18,10 +18,21 @@ npm install -g @kaitranntt/ccs
 **Benefits of npm installation:**
 - ✅ Cross-platform compatibility
 - ✅ Automatic PATH configuration
+- ✅ Auto-creates config files via postinstall script
 - ✅ Easy updates: `npm update -g @kaitranntt/ccs`
 - ✅ Clean uninstall: `npm uninstall -g @kaitranntt/ccs`
 - ✅ Version pinning support
 - ✅ Dependency management
+
+**What Happens During Install:**
+1. npm downloads and installs the package
+2. Postinstall script automatically creates `~/.ccs/config.json` and `~/.ccs/glm.settings.json`
+3. npm creates `ccs` command in your PATH
+
+**Note**: If you use `npm install --ignore-scripts`, config files won't be created. Run without that flag:
+```bash
+npm install -g @kaitranntt/ccs --force
+```
 
 ## One-Liner Installation (Traditional)
 

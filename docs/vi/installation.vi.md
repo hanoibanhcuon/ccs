@@ -1,6 +1,40 @@
 # Hướng Dẫn Cài Đặt CCS
 
-## Cài Đặt Một Dòng Lệnh (Khuyến Nghị)
+## Cài Đặt npm Package (Được khuyến nghị)
+
+### Cài Đặt Đa Nền Tảng
+
+**macOS / Linux / Windows**
+```bash
+npm install -g @kaitranntt/ccs
+```
+
+**Tương thích với tất cả các trình quản lý package:**
+- `npm install -g @kaitranntt/ccs`
+- `yarn global add @kaitranntt/ccs`
+- `pnpm add -g @kaitranntt/ccs`
+- `bun add -g @kaitranntt/ccs`
+
+**Lợi ích của việc cài đặt npm:**
+- ✅ Tương thích đa nền tảng
+- ✅ Cấu hình PATH tự động
+- ✅ Tự động tạo file cấu hình qua script postinstall
+- ✅ Cập nhật dễ dàng: `npm update -g @kaitranntt/ccs`
+- ✅ Gỡ cài đặt sạch: `npm uninstall -g @kaitranntt/ccs`
+- ✅ Hỗ trợ version pinning
+- ✅ Quản lý dependencies
+
+**Những Gì Xảy Ra Trong Quá Trình Cài Đặt:**
+1. npm tải xuống và cài đặt package
+2. Script postinstall tự động tạo `~/.ccs/config.json` và `~/.ccs/glm.settings.json`
+3. npm tạo lệnh `ccs` trong PATH của bạn
+
+**Lưu ý**: Nếu bạn dùng `npm install --ignore-scripts`, file cấu hình sẽ không được tạo. Chạy lại mà không có flag đó:
+```bash
+npm install -g @kaitranntt/ccs --force
+```
+
+## Cài Đặt Một Dòng Lệnh (Truyền thống)
 
 ### macOS / Linux
 
@@ -183,7 +217,7 @@ echo 'set -gx PATH $HOME/.local/bin $PATH' >> ~/.config/fish/config.fish
 - PowerShell 5.1+ (đã cài sẵn trên Windows 10+)
 - [Claude CLI](https://docs.claude.com/en/docs/claude-code/installation)
 
-### Cài đặt jq (chỉ macOS / Linux)
+### Cài đặt jq (macOS / Linux, tùy chọn)
 
 ```bash
 # macOS

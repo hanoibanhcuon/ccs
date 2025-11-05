@@ -87,6 +87,8 @@ bun add -g @kaitranntt/ccs
 
 ### Configuration (Auto-created)
 
+**CCS automatically creates configuration during installation** (via npm postinstall script).
+
 **~/.ccs/config.json**:
 ```json
 {

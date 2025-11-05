@@ -298,6 +298,51 @@ test_case "Version without ./ prefix" "Can run 'ccs --version' from PATH" bash -
 "
 
 # ============================================================================
+# SECTION 10: NPM POSTINSTALL TESTING
+# ============================================================================
+echo ""
+echo -e "${YELLOW}===== SECTION 10: NPM POSTINSTALL TESTING =====${NC}"
+
+test_case "NPM postinstall creates config.json" "Postinstall creates ~/.ccs/config.json" bash -c "
+    # Clean slate
+    rm -rf ~/.ccs
+
+    # Run postinstall script directly
+    cd /tmp/ccs-test
+    node scripts/postinstall.js > /dev/null 2>&1
+
+    # Verify config created
+    [[ -f ~/.ccs/config.json ]]
+"
+
+test_case "NPM postinstall creates glm.settings.json" "Postinstall creates GLM template" bash -c "
+    # Should exist from previous test
+    [[ -f ~/.ccs/glm.settings.json ]]
+"
+
+test_case "NPM postinstall is idempotent" "Running postinstall twice is safe" bash -c "
+    # Create custom config
+    echo '{\"profiles\":{\"custom\":\"~/.custom.json\"}}' > ~/.ccs/config.json
+
+    # Run postinstall again
+    cd /tmp/ccs-test
+    node scripts/postinstall.js > /dev/null 2>&1
+
+    # Verify custom config preserved
+    grep -q 'custom' ~/.ccs/config.json
+"
+
+test_case "NPM postinstall output format" "Postinstall uses ASCII symbols" bash -c "
+    # Clean and re-run with output
+    rm -rf ~/.ccs
+    cd /tmp/ccs-test
+    output=\$(node scripts/postinstall.js 2>&1)
+
+    # Check for ASCII symbols ([OK], [!]) not emojis
+    [[ \$output =~ \\[OK\\]|\\[!\\] ]]
+"
+
+# ============================================================================
 # FINAL RESULTS
 # ============================================================================
 echo ""

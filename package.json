@@ -29,6 +29,7 @@
   "files": [
     "bin/",
     "lib/",
+    "scripts/",
     "config/",
     "VERSION",
     "README.md",
@@ -47,6 +48,7 @@
     "test": "bash tests/edge-cases.sh",
     "prepublishOnly": "node scripts/sync-version.js",
     "prepack": "node scripts/sync-version.js",
-    "prepare": "node scripts/check-executables.js"
+    "prepare": "node scripts/check-executables.js",
+    "postinstall": "node scripts/postinstall.js"
   }
 }
