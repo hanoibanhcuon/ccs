@@ -1,6 +1,29 @@
 # CCS Installation Guide
 
-## One-Liner Installation (Recommended)
+## npm Package Installation (Recommended)
+
+### Cross-Platform Installation
+
+**macOS / Linux / Windows**
+```bash
+npm install -g @kai/ccs
+```
+
+**Compatible with all package managers:**
+- `npm install -g @kai/ccs`
+- `yarn global add @kai/ccs`
+- `pnpm add -g @kai/ccs`
+- `bun add -g @kai/ccs`
+
+**Benefits of npm installation:**
+- ✅ Cross-platform compatibility
+- ✅ Automatic PATH configuration
+- ✅ Easy updates: `npm update -g @kai/ccs`
+- ✅ Clean uninstall: `npm uninstall -g @kai/ccs`
+- ✅ Version pinning support
+- ✅ Dependency management
+
+## One-Liner Installation (Traditional)
 
 ### macOS / Linux
 
