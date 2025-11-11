@@ -4,6 +4,8 @@
 const http = require('http');
 const https = require('https');
 const GlmtTransformer = require('./glmt-transformer');
+const SSEParser = require('./sse-parser');
+const DeltaAccumulator = require('./delta-accumulator');
 
 /**
  * GlmtProxy - Embedded HTTP proxy for GLM thinking support
@@ -12,7 +14,7 @@ const GlmtTransformer = require('./glmt-transformer');
  * - Intercepts Claude CLI → Z.AI calls
  * - Transforms Anthropic format → OpenAI format
  * - Converts reasoning_content → thinking blocks
- * - Buffered mode only (streaming not supported)
+ * - Supports both streaming and buffered modes
  *
  * Lifecycle:
  * - Spawned by bin/ccs.js when 'glmt' profile detected
@@ -30,11 +32,14 @@ const GlmtTransformer = require('./glmt-transformer');
 class GlmtProxy {
   constructor(config = {}) {
     this.transformer = new GlmtTransformer({ verbose: config.verbose });
-    this.upstreamUrl = 'https://api.z.ai/api/coding/paas/v4/chat/completions';
+    // Use ANTHROPIC_BASE_URL from environment (set by settings.json) or fallback to Z.AI default
+    this.upstreamUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/coding/paas/v4/chat/completions';
     this.server = null;
     this.port = null;
     this.verbose = config.verbose || false;
     this.timeout = config.timeout || 120000; // 120s default
+    this.streamingEnabled = process.env.CCS_GLMT_STREAMING !== 'disabled';
+    this.forceStreaming = process.env.CCS_GLMT_STREAMING === 'force';
   }
 
   /**
@@ -52,8 +57,12 @@ class GlmtProxy {
         this.port = this.server.address().port;
         // Signal parent process
         console.log(`PROXY_READY:${this.port}`);
-        // One-time info message (always shown)
-        console.error(`[glmt] Proxy listening on port ${this.port} (buffered mode)`);
+
+        // Info message (only show in verbose mode)
+        if (this.verbose) {
+          const mode = this.streamingEnabled ? 'streaming mode' : 'buffered mode';
+          console.error(`[glmt] Proxy listening on port ${this.port} (${mode})`);
+        }
 
         // Debug mode notice
         if (this.transformer.debugLog) {
@@ -108,35 +117,14 @@ class GlmtProxy {
         return;
       }
 
-      // Transform to OpenAI format
-      const { openaiRequest, thinkingConfig } =
-        this.transformer.transformRequest(anthropicRequest);
+      // Branch: streaming or buffered
+      const useStreaming = (anthropicRequest.stream && this.streamingEnabled) || this.forceStreaming;
 
-      this.log(`Transformed request, thinking: ${thinkingConfig.thinking}`);
-
-      // Forward to Z.AI
-      const openaiResponse = await this._forwardToUpstream(
-        openaiRequest,
-        req.headers
-      );
-
-      this.log(`Received response from upstream`);
-
-      // Transform back to Anthropic format
-      const anthropicResponse = this.transformer.transformResponse(
-        openaiResponse,
-        thinkingConfig
-      );
-
-      // Return to Claude CLI
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      });
-      res.end(JSON.stringify(anthropicResponse));
-
-      const duration = Date.now() - startTime;
-      this.log(`Request completed in ${duration}ms`);
+      if (useStreaming) {
+        await this._handleStreamingRequest(req, res, anthropicRequest, startTime);
+      } else {
+        await this._handleBufferedRequest(req, res, anthropicRequest, startTime);
+      }
 
     } catch (error) {
       console.error('[glmt-proxy] Request error:', error.message);
@@ -151,6 +139,76 @@ class GlmtProxy {
         }
       }));
     }
+  }
+
+  /**
+   * Handle buffered (non-streaming) request
+   * @private
+   */
+  async _handleBufferedRequest(req, res, anthropicRequest, startTime) {
+    // Transform to OpenAI format
+    const { openaiRequest, thinkingConfig } =
+      this.transformer.transformRequest(anthropicRequest);
+
+    this.log(`Transformed request, thinking: ${thinkingConfig.thinking}`);
+
+    // Forward to Z.AI
+    const openaiResponse = await this._forwardToUpstream(
+      openaiRequest,
+      req.headers
+    );
+
+    this.log(`Received response from upstream`);
+
+    // Transform back to Anthropic format
+    const anthropicResponse = this.transformer.transformResponse(
+      openaiResponse,
+      thinkingConfig
+    );
+
+    // Return to Claude CLI
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify(anthropicResponse));
+
+    const duration = Date.now() - startTime;
+    this.log(`Request completed in ${duration}ms`);
+  }
+
+  /**
+   * Handle streaming request
+   * @private
+   */
+  async _handleStreamingRequest(req, res, anthropicRequest, startTime) {
+    this.log('Using streaming mode');
+
+    // Transform request
+    const { openaiRequest, thinkingConfig } =
+      this.transformer.transformRequest(anthropicRequest);
+
+    // Force streaming
+    openaiRequest.stream = true;
+
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+
+    this.log('Starting SSE stream to Claude CLI');
+
+    // Forward and stream
+    await this._forwardAndStreamUpstream(
+      openaiRequest,
+      req.headers,
+      res,
+      thinkingConfig,
+      startTime
+    );
   }
 
   /**
@@ -194,7 +252,7 @@ class GlmtProxy {
       const options = {
         hostname: url.hostname,
         port: url.port || 443,
-        path: '/api/coding/paas/v4/chat/completions', // OpenAI-compatible endpoint
+        path: url.pathname || '/api/coding/paas/v4/chat/completions',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,7 +264,7 @@ class GlmtProxy {
       };
 
       // Debug logging
-      this.log(`Forwarding to: ${url.hostname}${options.path}`);
+      this.log(`Forwarding to: ${url.hostname}${url.pathname}`);
 
       // Set timeout
       const timeoutHandle = setTimeout(() => {
@@ -243,6 +301,108 @@ class GlmtProxy {
 
       req.on('error', (error) => {
         clearTimeout(timeoutHandle);
+        reject(error);
+      });
+
+      req.write(requestBody);
+      req.end();
+    });
+  }
+
+  /**
+   * Forward request to Z.AI and stream response
+   * @param {Object} openaiRequest - OpenAI format request
+   * @param {Object} originalHeaders - Original request headers
+   * @param {http.ServerResponse} clientRes - Response to Claude CLI
+   * @param {Object} thinkingConfig - Thinking configuration
+   * @param {number} startTime - Request start time
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _forwardAndStreamUpstream(openaiRequest, originalHeaders, clientRes, thinkingConfig, startTime) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(this.upstreamUrl);
+      const requestBody = JSON.stringify(openaiRequest);
+
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname || '/api/coding/paas/v4/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody),
+          'Authorization': originalHeaders['authorization'] || '',
+          'User-Agent': 'CCS-GLMT-Proxy/1.0',
+          'Accept': 'text/event-stream'
+        }
+      };
+
+      this.log(`Forwarding streaming request to: ${url.hostname}${url.pathname}`);
+
+      // C-03 Fix: Apply timeout to streaming requests
+      const timeoutHandle = setTimeout(() => {
+        req.destroy();
+        reject(new Error(`Streaming request timeout after ${this.timeout}ms`));
+      }, this.timeout);
+
+      const req = https.request(options, (upstreamRes) => {
+        clearTimeout(timeoutHandle);
+        if (upstreamRes.statusCode !== 200) {
+          let body = '';
+          upstreamRes.on('data', chunk => body += chunk);
+          upstreamRes.on('end', () => {
+            reject(new Error(`Upstream error: ${upstreamRes.statusCode}\n${body}`));
+          });
+          return;
+        }
+
+        const parser = new SSEParser();
+        const accumulator = new DeltaAccumulator(thinkingConfig);
+
+        upstreamRes.on('data', (chunk) => {
+          try {
+            const events = parser.parse(chunk);
+
+            events.forEach(event => {
+              // Transform OpenAI delta → Anthropic events
+              const anthropicEvents = this.transformer.transformDelta(event, accumulator);
+
+              // Forward to Claude CLI
+              anthropicEvents.forEach(evt => {
+                const eventLine = `event: ${evt.event}\n`;
+                const dataLine = `data: ${JSON.stringify(evt.data)}\n\n`;
+                clientRes.write(eventLine + dataLine);
+              });
+            });
+          } catch (error) {
+            this.log(`Error processing chunk: ${error.message}`);
+          }
+        });
+
+        upstreamRes.on('end', () => {
+          const duration = Date.now() - startTime;
+          this.log(`Streaming completed in ${duration}ms`);
+          clientRes.end();
+          resolve();
+        });
+
+        upstreamRes.on('error', (error) => {
+          clearTimeout(timeoutHandle);
+          this.log(`Upstream stream error: ${error.message}`);
+          clientRes.write(`event: error\n`);
+          clientRes.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+          clientRes.end();
+          reject(error);
+        });
+      });
+
+      req.on('error', (error) => {
+        clearTimeout(timeoutHandle);
+        this.log(`Request error: ${error.message}`);
+        clientRes.write(`event: error\n`);
+        clientRes.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        clientRes.end();
         reject(error);
       });
 

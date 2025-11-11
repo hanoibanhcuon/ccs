@@ -30,9 +30,11 @@ CCS (Claude Code Switch): CLI wrapper for instant switching between multiple Cla
 
 ## Architecture
 
-### v3.2 GLMT Profile
+### v3.4 GLMT Streaming
 
-**Implementation**: Embedded HTTP proxy converts Anthropic ↔ OpenAI formats
+**Streaming support added**: Real-time delivery of reasoning content
+
+**Architecture**: Embedded HTTP proxy with bidirectional streaming
 
 **[!] Important**: GLMT only available in Node.js version (`bin/ccs.js`). Native shell versions (`lib/ccs`, `lib/ccs.ps1`) do not support GLMT yet (requires HTTP server).
 
@@ -41,28 +43,42 @@ CCS (Claude Code Switch): CLI wrapper for instant switching between multiple Cla
 2. `bin/ccs.js` spawns `bin/glmt-proxy.js` on localhost random port
 3. Modifies `glmt.settings.json`: `ANTHROPIC_BASE_URL=http://127.0.0.1:<port>`
 4. Spawns Claude CLI with modified settings
-5. Proxy intercepts requests:
-   - `glmt-transformer.js` converts Anthropic → OpenAI format
-   - Injects reasoning parameters (`reasoning: true`, `reasoning_effort`)
-   - Forwards to `api.z.ai/api/coding/paas/v4/chat/completions`
-   - Converts response: `reasoning_content` → thinking blocks
-   - Returns Anthropic format to Claude CLI
-6. Thinking blocks appear in Claude Code UI
+5. Proxy intercepts requests (streaming or buffered):
+   - **Streaming mode** (default):
+     - `SSEParser` parses incremental SSE events from Z.AI
+     - `DeltaAccumulator` tracks content block state
+     - `glmt-transformer.js` converts OpenAI deltas → Anthropic events
+     - Real-time delivery to Claude CLI (TTFB <500ms)
+   - **Buffered mode** (`CCS_GLMT_STREAMING=disabled`):
+     - Waits for complete response
+     - Single transformation pass
+     - Higher latency (2-10s TTFB)
+6. Thinking blocks appear in Claude Code UI (real-time or complete)
 
 **Files**:
-- `bin/glmt-proxy.js` (275 lines): HTTP proxy server
-- `bin/glmt-transformer.js` (267 lines): Format conversion
+- `bin/glmt-proxy.js` (463 lines): HTTP proxy server with streaming
+- `bin/glmt-transformer.js` (685 lines): Format conversion + delta handling
+- `bin/sse-parser.js` (97 lines): SSE stream parser
+- `bin/delta-accumulator.js` (156 lines): State tracking for streaming
 - `config/base-glmt.settings.json`: Template with Z.AI endpoint
-- `tests/glmt-transformer.test.js` (285 lines): Unit tests
+- `tests/glmt-transformer.test.js`: Unit tests
 
 **Control tags**:
 - `<Thinking:On|Off>` - Enable/disable reasoning
 - `<Effort:Low|Medium|High>` - Control reasoning depth
 
-**Limitations**:
-- Streaming not supported (buffered mode only)
-- Requires Z.AI API key with coding plan access
-- Proxy lifecycle tied to Claude CLI
+**Environment variables**:
+- `CCS_GLMT_STREAMING=disabled` - Force buffered mode
+- `CCS_GLMT_STREAMING=force` - Force streaming (override client)
+- `CCS_DEBUG_LOG=1` - Enable debug file logging
+
+**Security limits** (DoS protection):
+- SSE buffer: 1MB max
+- Content buffers: 10MB max per block
+- Content blocks: 100 max per message
+- Request timeout: 120s (both modes)
+
+**Confirmed working**: Z.AI (1498 reasoning chunks tested)
 
 ### v3.1 Shared Data
 
@@ -112,8 +128,10 @@ Multiple profiles run simultaneously via isolated config dirs.
 - `bin/ccs.js`: Node.js entry point
 - `bin/instance-manager.js`: Instance orchestration
 - `bin/shared-manager.js`: Shared data symlinks (v3.1)
-- `bin/glmt-proxy.js`: Embedded HTTP proxy (v3.2)
-- `bin/glmt-transformer.js`: Anthropic ↔ OpenAI conversion (v3.2)
+- `bin/glmt-proxy.js`: Embedded HTTP proxy (v3.3 streaming)
+- `bin/glmt-transformer.js`: Anthropic ↔ OpenAI conversion + streaming (v3.3)
+- `bin/sse-parser.js`: SSE stream parser (v3.3)
+- `bin/delta-accumulator.js`: Streaming state tracker (v3.3)
 - `scripts/postinstall.js`: Auto-creates configs (idempotent)
 - `lib/ccs`: bash executable
 - `lib/ccs.ps1`: PowerShell executable
@@ -315,7 +333,7 @@ All values = strings (not booleans/objects) to prevent PowerShell crashes.
 ```
 
 **Proxy Failures**:
-- Timeout (>30s): Proxy didn't start → check Node.js ≥14
+- Timeout (>120s): Proxy didn't start → check Node.js ≥14
 - Port conflicts: Uses random port, unlikely
 - Connection refused: Firewall blocking 127.0.0.1
 
@@ -324,9 +342,11 @@ All values = strings (not booleans/objects) to prevent PowerShell crashes.
 - Verify `<Thinking:On>` tag not overridden
 - Test with `ccs glm` (no thinking) to isolate proxy issues
 
-**Streaming Disclaimer**:
-- GLMT uses buffered mode (streaming not supported)
-- Trade-off: thinking capability vs streaming speed
+**Streaming Issues**:
+- Buffer errors: Hit DoS protection limits (1MB SSE, 10MB content)
+- Slow TTFB: Try disabling streaming: `CCS_GLMT_STREAMING=disabled`
+- Incomplete reasoning: Z.AI may not support incremental delivery for all models
+- Fallback: Buffered mode always available
 
 **Debug Mode**:
 ```bash
@@ -337,6 +357,9 @@ ccs glmt --verbose "test"
 export CCS_DEBUG_LOG=1
 ccs glmt --verbose "test"
 # Logs: ~/.ccs/logs/
+
+# Test streaming vs buffered
+CCS_GLMT_STREAMING=disabled ccs glmt "compare latency"
 ```
 
 ## Error Handling

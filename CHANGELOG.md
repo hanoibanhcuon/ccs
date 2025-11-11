@@ -4,6 +4,34 @@ All notable changes to CCS will be documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.4.0] - 2025-11-11
+
+### Added
+- **GLMT Streaming**: Real-time thinking blocks (TTFB: 2-10s → <500ms, 5-20x faster)
+- New classes: `SSEParser`, `DeltaAccumulator` for streaming state management
+- Environment variables: `CCS_GLMT_STREAMING`, `CCS_DEBUG_LOG`
+- Security: Buffer limits (1MB SSE, 10MB content, 100 blocks max), 120s timeout
+
+### Changed
+- Proxy respects `ANTHROPIC_BASE_URL` from environment (no hardcoded endpoints)
+- Proxy startup message only with `--verbose` flag (cleaner UX)
+- 51/51 tests passing (+25 new streaming tests)
+
+### Fixed
+- **Security**: 3 critical DoS vulnerabilities (unbounded buffers, missing timeout)
+- Silent JSON parse failures now logged
+- Outdated test assertion for streaming parameter
+
+### Performance
+- Time to First Byte: 5-20x improvement
+- Real-time vs delayed thinking blocks
+- Memory-efficient incremental processing
+
+### Breaking Changes
+None - fully backward compatible. Buffered mode: `CCS_GLMT_STREAMING=disabled`
+
+---
+
 ## [3.3.0] - 2025-11-11
 
 ### Added

@@ -272,7 +272,7 @@ runner.test('disables streaming (not yet supported)', () => {
 
   const { openaiRequest } = transformer.transformRequest(input);
 
-  assertEqual(openaiRequest.stream, false, 'stream should be disabled');
+  assertEqual(openaiRequest.stream, true, 'stream should be enabled when requested');
 });
 
 // Test 13: Debug mode disabled by default

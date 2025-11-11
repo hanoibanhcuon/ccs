@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const SSEParser = require('./sse-parser');
+const DeltaAccumulator = require('./delta-accumulator');
 
 /**
  * GlmtTransformer - Convert between Anthropic and OpenAI formats with thinking support
@@ -73,10 +75,10 @@ class GlmtTransformer {
         openaiRequest.top_p = anthropicRequest.top_p;
       }
 
-      // 5. Handle streaming (not yet supported)
-      // Silently override to buffered mode
-      if (anthropicRequest.stream) {
-        openaiRequest.stream = false;
+      // 5. Handle streaming
+      // Keep stream parameter from request
+      if (anthropicRequest.stream !== undefined) {
+        openaiRequest.stream = anthropicRequest.stream;
       }
 
       // 6. Inject reasoning parameters
@@ -419,6 +421,251 @@ class GlmtTransformer {
     const total = Object.keys(checks).length;
 
     return { checks, passed, total, valid: passed === total };
+  }
+
+  /**
+   * Transform OpenAI streaming delta to Anthropic events
+   * @param {Object} openaiEvent - Parsed SSE event from Z.AI
+   * @param {DeltaAccumulator} accumulator - State accumulator
+   * @returns {Array<Object>} Array of Anthropic SSE events
+   */
+  transformDelta(openaiEvent, accumulator) {
+    const events = [];
+
+    // Handle [DONE] marker
+    if (openaiEvent.event === 'done') {
+      return this.finalizeDelta(accumulator);
+    }
+
+    const choice = openaiEvent.data?.choices?.[0];
+    if (!choice) return events;
+
+    const delta = choice.delta;
+    if (!delta) return events;
+
+    // Message start
+    if (!accumulator.messageStarted) {
+      if (openaiEvent.data.model) {
+        accumulator.model = openaiEvent.data.model;
+      }
+      events.push(this._createMessageStartEvent(accumulator));
+      accumulator.messageStarted = true;
+    }
+
+    // Role
+    if (delta.role) {
+      accumulator.role = delta.role;
+    }
+
+    // Reasoning content delta (Z.AI streams incrementally - confirmed in Phase 02)
+    if (delta.reasoning_content) {
+      const currentBlock = accumulator.getCurrentBlock();
+
+      if (!currentBlock || currentBlock.type !== 'thinking') {
+        // Start thinking block
+        const block = accumulator.startBlock('thinking');
+        events.push(this._createContentBlockStartEvent(block));
+      }
+
+      accumulator.addDelta(delta.reasoning_content);
+      events.push(this._createThinkingDeltaEvent(
+        accumulator.getCurrentBlock(),
+        delta.reasoning_content
+      ));
+    }
+
+    // Text content delta
+    if (delta.content) {
+      const currentBlock = accumulator.getCurrentBlock();
+
+      // Close thinking block if transitioning from thinking to text
+      if (currentBlock && currentBlock.type === 'thinking' && !currentBlock.stopped) {
+        events.push(this._createSignatureDeltaEvent(currentBlock));
+        events.push(this._createContentBlockStopEvent(currentBlock));
+        accumulator.stopCurrentBlock();
+      }
+
+      if (!accumulator.getCurrentBlock() || accumulator.getCurrentBlock().type !== 'text') {
+        // Start text block
+        const block = accumulator.startBlock('text');
+        events.push(this._createContentBlockStartEvent(block));
+      }
+
+      accumulator.addDelta(delta.content);
+      events.push(this._createTextDeltaEvent(
+        accumulator.getCurrentBlock(),
+        delta.content
+      ));
+    }
+
+    // Usage update (appears in final chunk usually)
+    if (openaiEvent.data.usage) {
+      accumulator.updateUsage(openaiEvent.data.usage);
+    }
+
+    // Finish reason
+    if (choice.finish_reason) {
+      accumulator.finishReason = choice.finish_reason;
+    }
+
+    return events;
+  }
+
+  /**
+   * Finalize streaming and generate closing events
+   * @param {DeltaAccumulator} accumulator - State accumulator
+   * @returns {Array<Object>} Final Anthropic SSE events
+   */
+  finalizeDelta(accumulator) {
+    if (accumulator.finalized) {
+      return []; // Already finalized
+    }
+
+    const events = [];
+
+    // Close current content block if any
+    const currentBlock = accumulator.getCurrentBlock();
+    if (currentBlock && !currentBlock.stopped) {
+      if (currentBlock.type === 'thinking') {
+        events.push(this._createSignatureDeltaEvent(currentBlock));
+      }
+      events.push(this._createContentBlockStopEvent(currentBlock));
+      accumulator.stopCurrentBlock();
+    }
+
+    // Message delta (stop reason + usage)
+    events.push({
+      event: 'message_delta',
+      data: {
+        type: 'message_delta',
+        delta: {
+          stop_reason: this._mapStopReason(accumulator.finishReason || 'stop')
+        },
+        usage: {
+          output_tokens: accumulator.outputTokens
+        }
+      }
+    });
+
+    // Message stop
+    events.push({
+      event: 'message_stop',
+      data: {
+        type: 'message_stop'
+      }
+    });
+
+    accumulator.finalized = true;
+    return events;
+  }
+
+  /**
+   * Create message_start event
+   * @private
+   */
+  _createMessageStartEvent(accumulator) {
+    return {
+      event: 'message_start',
+      data: {
+        type: 'message_start',
+        message: {
+          id: accumulator.messageId,
+          type: 'message',
+          role: accumulator.role,
+          content: [],
+          model: accumulator.model || 'glm-4.6',
+          stop_reason: null,
+          usage: {
+            input_tokens: accumulator.inputTokens,
+            output_tokens: 0
+          }
+        }
+      }
+    };
+  }
+
+  /**
+   * Create content_block_start event
+   * @private
+   */
+  _createContentBlockStartEvent(block) {
+    return {
+      event: 'content_block_start',
+      data: {
+        type: 'content_block_start',
+        index: block.index,
+        content_block: {
+          type: block.type,
+          [block.type]: ''
+        }
+      }
+    };
+  }
+
+  /**
+   * Create thinking_delta event
+   * @private
+   */
+  _createThinkingDeltaEvent(block, delta) {
+    return {
+      event: 'content_block_delta',
+      data: {
+        type: 'content_block_delta',
+        index: block.index,
+        delta: {
+          type: 'thinking_delta',
+          thinking: delta
+        }
+      }
+    };
+  }
+
+  /**
+   * Create text_delta event
+   * @private
+   */
+  _createTextDeltaEvent(block, delta) {
+    return {
+      event: 'content_block_delta',
+      data: {
+        type: 'content_block_delta',
+        index: block.index,
+        delta: {
+          type: 'text_delta',
+          text: delta
+        }
+      }
+    };
+  }
+
+  /**
+   * Create signature_delta event
+   * @private
+   */
+  _createSignatureDeltaEvent(block) {
+    const signature = this._generateThinkingSignature(block.content);
+    return {
+      event: 'signature_delta',
+      data: {
+        type: 'signature_delta',
+        index: block.index,
+        signature: signature
+      }
+    };
+  }
+
+  /**
+   * Create content_block_stop event
+   * @private
+   */
+  _createContentBlockStopEvent(block) {
+    return {
+      event: 'content_block_stop',
+      data: {
+        type: 'content_block_stop',
+        index: block.index
+      }
+    };
   }
 
   /**

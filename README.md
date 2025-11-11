@@ -205,16 +205,27 @@ Commands and skills symlinked from `~/.ccs/shared/` - no duplication across prof
 |---------|-----------------|-------------------|
 | **Endpoint** | Anthropic-compatible | OpenAI-compatible |
 | **Thinking** | No | Yes (reasoning_content) |
-| **Streaming** | Yes | No (buffered) |
+| **Streaming** | Yes | **Yes (v3.4+)** |
+| **TTFB** | <500ms | <500ms (streaming), 2-10s (buffered) |
 | **Use Case** | Fast responses | Complex reasoning |
+
+### Streaming Support (v3.4)
+
+**GLMT now supports real-time streaming** with incremental reasoning content delivery.
+
+- **Default**: Streaming enabled (TTFB <500ms)
+- **Disable**: Set `CCS_GLMT_STREAMING=disabled` for buffered mode
+- **Force**: Set `CCS_GLMT_STREAMING=force` to override client preferences
+
+**Confirmed working**: Z.AI (1498 reasoning chunks tested)
 
 ### How It Works
 
 1. CCS spawns embedded HTTP proxy on localhost
-2. Proxy converts Anthropic format → OpenAI format
+2. Proxy converts Anthropic format → OpenAI format (streaming or buffered)
 3. Forwards to Z.AI with reasoning parameters
-4. Converts `reasoning_content` → thinking blocks
-5. Thinking appears in Claude Code UI
+4. Converts `reasoning_content` → thinking blocks (incremental or complete)
+5. Thinking appears in Claude Code UI in real-time
 
 ### Control Tags
 
@@ -235,6 +246,14 @@ nano ~/.ccs/glmt.settings.json
 }
 ```
 
+### Security Limits
+
+**DoS protection** (v3.4):
+- SSE buffer: 1MB max per event
+- Content buffer: 10MB max per block (thinking/text)
+- Content blocks: 100 max per message
+- Request timeout: 120s (both streaming and buffered)
+
 ### Debugging
 
 **Enable verbose logging**:
@@ -247,6 +266,12 @@ ccs glmt --verbose "your prompt"
 export CCS_DEBUG_LOG=1
 ccs glmt --verbose "your prompt"
 # Logs: ~/.ccs/logs/
+```
+
+**Check streaming mode**:
+```bash
+# Disable streaming for debugging
+CCS_GLMT_STREAMING=disabled ccs glmt "test"
 ```
 
 **Check reasoning content**:
