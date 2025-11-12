@@ -152,12 +152,12 @@ console.log('\n=== Test 2: Debug Mode ON (via config) ===');
   console.log('\n✓ All checks passed for debug mode ON');
 }
 
-console.log('\n=== Test 3: Debug Mode via CCS_DEBUG_LOG=1 ===');
+console.log('\n=== Test 3: Debug Mode via CCS_DEBUG=1 ===');
 {
   // Clean up
   fs.rmSync(logDir, { recursive: true, force: true });
 
-  process.env.CCS_DEBUG_LOG = '1';
+  process.env.CCS_DEBUG = '1';
   const transformer = new GlmtTransformer({ verbose: false });
   console.log(`Debug logging: ${transformer.debugLog}`);
 
@@ -188,13 +188,13 @@ console.log('\n=== Test 3: Debug Mode via CCS_DEBUG_LOG=1 ===');
   console.log(`Files created: ${files.length}`);
 
   if (files.length === 4) {
-    console.log('✓ Debug mode enabled via CCS_DEBUG_LOG=1');
+    console.log('✓ Debug mode enabled via CCS_DEBUG=1');
   } else {
     console.log(`ERROR: Expected 4 files, got ${files.length}`);
     process.exit(1);
   }
 
-  delete process.env.CCS_DEBUG_LOG;
+  delete process.env.CCS_DEBUG;
 }
 
 console.log('\n=== Test 4: Error Handling (No Write Permission) ===');

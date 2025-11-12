@@ -92,7 +92,7 @@ ccs glmt "ultrathink this complex algorithm optimization"
 - `<Effort:Low|Medium|High>` - Control reasoning depth
 
 **Environment variables**:
-- `CCS_DEBUG=1` - Enable debug file logging to ~/.ccs/logs/
+- `CCS_DEBUG=1` - Enable debug logging (file logging to ~/.ccs/logs/ + enhanced console diagnostics)
 
 **Security limits** (DoS protection):
 - SSE buffer: 1MB max
@@ -372,6 +372,12 @@ All values = strings (not booleans/objects) to prevent PowerShell crashes.
 - Try using "think" keywords in prompt: `ccs glmt "think about the solution"`
 - Test with `ccs glm` (no thinking) to isolate proxy issues
 
+**Blank/Empty Thinking Blocks** (v3.5.1+ fix):
+- Fixed: Signature timing race where signature sent before content accumulated
+- Solution: Content verification guard returns null if empty, 3 callers handle gracefully
+- Diagnostics: `export CCS_DEBUG=1` shows reasoning deltas, block creation, signature timing
+- Regression tests: `tests/unit/glmt/test-thinking-signature-race.js` (6 tests)
+
 **Chinese Output / Unexpected Language**:
 - Locale enforcer always injects "MUST respond in English" into system prompts
 - If issues persist, check Z.AI API configuration
@@ -401,6 +407,12 @@ ccs glmt --verbose "test"
 export CCS_DEBUG=1
 ccs glmt --verbose "test"
 # Logs: ~/.ccs/logs/
+
+# Enhanced diagnostics (file + console)
+export CCS_DEBUG=1
+ccs glmt "think about complex task"
+# File logs: ~/.ccs/logs/
+# Console: reasoning deltas, block creation, signature timing
 ```
 
 ## Error Handling

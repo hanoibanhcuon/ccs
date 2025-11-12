@@ -288,11 +288,11 @@ runner.test('debug mode enabled via config', () => {
 });
 
 // Test 15: Debug mode enabled via env var
-runner.test('debug mode enabled via CCS_DEBUG_LOG=1', () => {
-  process.env.CCS_DEBUG_LOG = '1';
+runner.test('debug mode enabled via CCS_DEBUG=1', () => {
+  process.env.CCS_DEBUG = '1';
   const transformer = new GlmtTransformer();
-  assertEqual(transformer.debugLog, true, 'debugLog should be true when CCS_DEBUG_LOG=1');
-  delete process.env.CCS_DEBUG_LOG;
+  assertEqual(transformer.debugLog, true, 'debugLog should be true when CCS_DEBUG=1');
+  delete process.env.CCS_DEBUG;
 });
 
 // Test 16: Debug log directory path

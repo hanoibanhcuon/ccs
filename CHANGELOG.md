@@ -2,6 +2,20 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/)
 
+## [3.4.5] - 2025-11-11
+
+### Fixed
+- Thinking block signature timing race (blocks appeared blank in Claude CLI UI)
+- Content verification guard in `_createSignatureDeltaEvent()` returns null if empty
+
+### Changed
+- Consolidated debug flags: `CCS_DEBUG_LOG`, `CCS_GLMT_DEBUG` → `CCS_DEBUG` only
+
+### Added
+- 6 regression tests for thinking signature race (`test-thinking-signature-race.js`)
+
+---
+
 ## [3.4.4] - 2025-11-11
 
 ### Fixed

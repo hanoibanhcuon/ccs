@@ -199,6 +199,24 @@ Commands and skills symlinked from `~/.ccs/shared/` - no duplication across prof
 
 > **[!] Important**: GLMT requires npm installation (`npm install -g @kaitranntt/ccs`). Not available in native shell versions (requires Node.js HTTP server).
 
+### Acknowledgments: The Foundation That Made GLMT Possible
+
+> **[i] Pioneering Work by [@Bedolla](https://github.com/Bedolla)**
+>
+> **CCS's GLMT implementation owes its existence to the groundbreaking work of [@Bedolla](https://github.com/Bedolla)**, who created [ZaiTransformer](https://github.com/Bedolla/ZaiTransformer/) - the **first integration** to bridge [Claude Code Router (CCR)](https://github.com/musistudio/claude-code-router) with Z.AI's reasoning capabilities.
+>
+> **Why this matters**: Before ZaiTransformer, no one had successfully integrated Z.AI's thinking mode with Claude Code's workflow. Bedolla's work wasn't just helpful - it was **foundational**. His implementation of:
+>
+> - **Request/response transformation architecture** - The conceptual blueprint for how to bridge Anthropic and OpenAI formats
+> - **Thinking mode control mechanisms** - The patterns for managing reasoning_content delivery
+> - **Embedded proxy design** - The architecture that CCS's GLMT proxy is built upon
+>
+> These contributions directly inspired and enabled GLMT's design. **Without ZaiTransformer's pioneering work, GLMT wouldn't exist in its current form**. The technical patterns, transformation logic, and proxy architecture implemented in CCS are a direct evolution of the concepts Bedolla first proved viable.
+>
+> **Recognition**: If you benefit from GLMT's thinking capabilities, you're benefiting from Bedolla's vision and engineering. Please consider starring [ZaiTransformer](https://github.com/Bedolla/ZaiTransformer/) to support pioneering work in the Claude Code ecosystem.
+
+---
+
 ### GLM vs GLMT
 
 | Feature | GLM (`ccs glm`) | GLMT (`ccs glmt`) |

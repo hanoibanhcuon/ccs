@@ -100,22 +100,32 @@ class DeltaAccumulator {
    */
   addDelta(delta) {
     const block = this.getCurrentBlock();
-    if (block) {
-      if (block.type === 'thinking') {
-        // C-02 Fix: Enforce buffer size limit
-        if (this.thinkingBuffer.length + delta.length > this.maxBufferSize) {
-          throw new Error(`Thinking buffer exceeded ${this.maxBufferSize} bytes (DoS protection)`);
-        }
-        this.thinkingBuffer += delta;
-        block.content = this.thinkingBuffer;
-      } else if (block.type === 'text') {
-        // C-02 Fix: Enforce buffer size limit
-        if (this.textBuffer.length + delta.length > this.maxBufferSize) {
-          throw new Error(`Text buffer exceeded ${this.maxBufferSize} bytes (DoS protection)`);
-        }
-        this.textBuffer += delta;
-        block.content = this.textBuffer;
+    if (!block) {
+      // FIX: Guard against null block (should never happen, but defensive)
+      console.error('[DeltaAccumulator] ERROR: addDelta called with no current block');
+      return;
+    }
+
+    if (block.type === 'thinking') {
+      // C-02 Fix: Enforce buffer size limit
+      if (this.thinkingBuffer.length + delta.length > this.maxBufferSize) {
+        throw new Error(`Thinking buffer exceeded ${this.maxBufferSize} bytes (DoS protection)`);
       }
+      this.thinkingBuffer += delta;
+      block.content = this.thinkingBuffer;
+
+      // FIX: Verify assignment succeeded (paranoid check for race conditions)
+      if (block.content.length !== this.thinkingBuffer.length) {
+        console.error('[DeltaAccumulator] ERROR: Block content assignment failed');
+        console.error(`Expected: ${this.thinkingBuffer.length}, Got: ${block.content.length}`);
+      }
+    } else if (block.type === 'text') {
+      // C-02 Fix: Enforce buffer size limit
+      if (this.textBuffer.length + delta.length > this.maxBufferSize) {
+        throw new Error(`Text buffer exceeded ${this.maxBufferSize} bytes (DoS protection)`);
+      }
+      this.textBuffer += delta;
+      block.content = this.textBuffer;
     }
   }
 
@@ -126,6 +136,11 @@ class DeltaAccumulator {
     const block = this.getCurrentBlock();
     if (block) {
       block.stopped = true;
+
+      // FIX: Log block closure for debugging (helps diagnose timing issues)
+      if (block.type === 'thinking' && process.env.CCS_DEBUG === '1') {
+        console.error(`[DeltaAccumulator] Stopped thinking block ${block.index}: ${block.content?.length || 0} chars`);
+      }
     }
   }
 

@@ -7,7 +7,7 @@
  * Simulates 3 consecutive messages to test if thinking blocks
  * appear in all messages or only the first one.
  *
- * Usage: CCS_DEBUG_LOG=1 node test-thinking-multi-message.js
+ * Usage: CCS_DEBUG=1 node test-thinking-multi-message.js
  */
 
 const { spawn } = require('child_process');
@@ -67,7 +67,7 @@ async function runMessage(messageIndex) {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        CCS_DEBUG_LOG: '1'
+        CCS_DEBUG: '1'
       }
     });
 

@@ -17,7 +17,7 @@ const LocaleEnforcer = require('./locale-enforcer');
  * - Response: OpenAI reasoning_content → Anthropic thinking blocks
  * - Tool Support: Anthropic tools ↔ OpenAI function calling (bidirectional)
  * - Streaming: Real-time tool calls with input_json deltas
- * - Debug mode: Log raw data to ~/.ccs/logs/ (CCS_DEBUG_LOG=1)
+ * - Debug mode: Log raw data to ~/.ccs/logs/ (CCS_DEBUG=1)
  * - Verbose mode: Console logging with timestamps
  * - Validation: Self-test transformation results
  *
@@ -37,16 +37,10 @@ class GlmtTransformer {
     this.defaultThinking = config.defaultThinking ?? true;
     this.verbose = config.verbose || false;
 
-    // Support both CCS_DEBUG and CCS_DEBUG_LOG (with deprecation warning)
-    const oldVar = process.env.CCS_DEBUG_LOG === '1';
-    const newVar = process.env.CCS_DEBUG === '1';
-    this.debugLog = config.debugLog ?? (newVar || oldVar);
-
-    // Show deprecation warning once
-    if (oldVar && !newVar && !GlmtTransformer._warnedDeprecation) {
-      console.warn('[glmt] Warning: CCS_DEBUG_LOG is deprecated, use CCS_DEBUG instead');
-      GlmtTransformer._warnedDeprecation = true;
-    }
+    // CCS_DEBUG controls all debug logging (file + console)
+    const debugEnabled = process.env.CCS_DEBUG === '1';
+    this.debugLog = config.debugLog ?? debugEnabled;
+    this.debugMode = config.debugMode ?? debugEnabled;
 
     this.debugLogDir = config.debugLogDir || path.join(os.homedir(), '.ccs', 'logs');
     this.modelMaxTokens = {
@@ -645,10 +639,20 @@ class GlmtTransformer {
     if (delta.reasoning_content) {
       const currentBlock = accumulator.getCurrentBlock();
 
+      // FIX: Enhanced debug logging for thinking block diagnostics
+      if (this.debugMode) {
+        console.error(`[GLMT-DEBUG] Reasoning delta: ${delta.reasoning_content.length} chars`);
+        console.error(`[GLMT-DEBUG] Current block: ${currentBlock?.type || 'none'}, index: ${currentBlock?.index ?? 'N/A'}`);
+      }
+
       if (!currentBlock || currentBlock.type !== 'thinking') {
         // Start thinking block
         const block = accumulator.startBlock('thinking');
         events.push(this._createContentBlockStartEvent(block));
+
+        if (this.debugMode) {
+          console.error(`[GLMT-DEBUG] Started new thinking block ${block.index}`);
+        }
       }
 
       accumulator.addDelta(delta.reasoning_content);
@@ -664,7 +668,10 @@ class GlmtTransformer {
 
       // Close thinking block if transitioning from thinking to text
       if (currentBlock && currentBlock.type === 'thinking' && !currentBlock.stopped) {
-        events.push(this._createSignatureDeltaEvent(currentBlock));
+        const signatureEvent = this._createSignatureDeltaEvent(currentBlock);
+        if (signatureEvent) { // FIX: Handle null return from signature race guard
+          events.push(signatureEvent);
+        }
         events.push(this._createContentBlockStopEvent(currentBlock));
         accumulator.stopCurrentBlock();
       }
@@ -691,7 +698,10 @@ class GlmtTransformer {
       const currentBlock = accumulator.getCurrentBlock();
       if (currentBlock && !currentBlock.stopped) {
         if (currentBlock.type === 'thinking') {
-          events.push(this._createSignatureDeltaEvent(currentBlock));
+          const signatureEvent = this._createSignatureDeltaEvent(currentBlock);
+          if (signatureEvent) { // FIX: Handle null return from signature race guard
+            events.push(signatureEvent);
+          }
         }
         events.push(this._createContentBlockStopEvent(currentBlock));
         accumulator.stopCurrentBlock();
@@ -794,7 +804,10 @@ class GlmtTransformer {
     const currentBlock = accumulator.getCurrentBlock();
     if (currentBlock && !currentBlock.stopped) {
       if (currentBlock.type === 'thinking') {
-        events.push(this._createSignatureDeltaEvent(currentBlock));
+        const signatureEvent = this._createSignatureDeltaEvent(currentBlock);
+        if (signatureEvent) { // FIX: Handle null return from signature race guard
+          events.push(signatureEvent);
+        }
       }
       events.push(this._createContentBlockStopEvent(currentBlock));
       accumulator.stopCurrentBlock();
@@ -914,7 +927,23 @@ class GlmtTransformer {
    * @private
    */
   _createSignatureDeltaEvent(block) {
+    // FIX: Guard against empty content (signature timing race)
+    // In streaming mode, signature may be requested before content fully accumulated
+    if (!block.content || block.content.length === 0) {
+      if (this.verbose) {
+        this.log(`WARNING: Skipping signature for empty thinking block ${block.index}`);
+        this.log(`This indicates a race condition - signature requested before content accumulated`);
+      }
+      return null; // Return null instead of event
+    }
+
     const signature = this._generateThinkingSignature(block.content);
+
+    // Enhanced logging for debugging
+    if (this.verbose) {
+      this.log(`Generating signature for block ${block.index}: ${block.content.length} chars`);
+    }
+
     return {
       event: 'content_block_delta',
       data: {
