@@ -2,6 +2,35 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/)
 
+## [3.5.0] - 2025-11-15
+
+### Added
+- Shell auto-completion (bash, zsh, PowerShell, Fish)
+- `--shell-completion` command (auto-installs for detected shell with proper comment markers, cross-platform)
+- Error codes (E101-E901) with documentation at docs/errors/
+- Fuzzy matching "Did you mean?" suggestions (Levenshtein distance)
+- Progress indicators (doctor command: [n/9] counter, GLMT proxy startup spinner)
+- Interactive confirmation prompts for destructive operations
+- `--yes/-y` flag for automation (skips confirmations)
+- `--json` flag for auth commands (list, show)
+- Impact display (session count, paths) before profile deletion
+- Comprehensive test suite (15 tests, 100% pass rate)
+
+### Changed
+- Error boxes: Unicode (╔═╗) → ASCII (===) for cross-platform compatibility
+- JSON output uses CCS version (3.5.0) instead of separate schema version
+- Help text includes EXAMPLES section across all platforms
+- Test suite properly counts test cases (not assertions)
+
+### Fixed
+- Standalone installer dependency handling (now downloads error-codes, progress-indicator, prompt files)
+- `--yes` flag bug (returned false instead of true, preventing auto-confirmation)
+- Help text consistency between Node.js and bash versions (added Uninstall section to bash)
+- Test pass rate calculation (now excludes skipped tests from denominator)
+- Help section comparison (locale-specific sort order)
+
+---
+
 ## [3.4.6] - 2025-11-12
 
 ### Added

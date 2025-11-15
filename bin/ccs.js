@@ -130,6 +130,7 @@ function handleHelpCommand() {
   console.log(colored('Flags:', 'cyan'));
   console.log(`  ${colored('-h, --help', 'yellow')}                  Show this help message`);
   console.log(`  ${colored('-v, --version', 'yellow')}               Show version and installation info`);
+  console.log(`  ${colored('--shell-completion', 'yellow')}          Install shell auto-completion`);
   console.log('');
 
   // Configuration
@@ -147,6 +148,19 @@ function handleHelpCommand() {
   console.log('  Skills:      ~/.ccs/shared/skills/');
   console.log('  Agents:      ~/.ccs/shared/agents/');
   console.log('  Note: Commands, skills, and agents are symlinked across all profiles');
+  console.log('');
+
+  // Examples
+  console.log(colored('Examples:', 'cyan'));
+  console.log('  Quick start:');
+  console.log(`    ${colored('$ ccs', 'yellow')}                        # Use default account`);
+  console.log(`    ${colored('$ ccs glm "implement API"', 'yellow')}    # Cost-optimized model`);
+  console.log('');
+  console.log('  Multi-account workflow:');
+  console.log(`    ${colored('$ ccs auth create work', 'yellow')}       # Create work profile`);
+  console.log(`    ${colored('$ ccs work "review PR"', 'yellow')}       # Use work account`);
+  console.log('');
+  console.log(`  For more: ${colored('https://github.com/kaitranntt/ccs#usage', 'cyan')}`);
   console.log('');
 
   // Uninstall
@@ -241,6 +255,10 @@ async function execClaudeWithProxy(claudeCli, profileName, args) {
   });
 
   // 3. Wait for proxy ready signal (with timeout)
+  const { ProgressIndicator } = require('./utils/progress-indicator');
+  const spinner = new ProgressIndicator('Starting GLMT proxy');
+  spinner.start();
+
   let port;
   try {
     port = await new Promise((resolve, reject) => {
@@ -268,8 +286,11 @@ async function execClaudeWithProxy(claudeCli, profileName, args) {
         }
       });
     });
+
+    spinner.succeed(`GLMT proxy ready on port ${port}`);
   } catch (error) {
-    console.error('[X] Failed to start GLMT proxy:', error.message);
+    spinner.fail('Failed to start GLMT proxy');
+    console.error('[X] Error:', error.message);
     console.error('');
     console.error('Possible causes:');
     console.error('  1. Port conflict (unlikely with random port)');
@@ -341,6 +362,58 @@ async function execClaudeWithProxy(claudeCli, profileName, args) {
   });
 }
 
+/**
+ * Handle shell completion installation
+ */
+async function handleShellCompletionCommand(args) {
+  const { ShellCompletionInstaller } = require('./utils/shell-completion');
+  const { colored } = require('./utils/helpers');
+
+  console.log(colored('Shell Completion Installer', 'bold'));
+  console.log('');
+
+  // Parse flags
+  let targetShell = null;
+  if (args.includes('--bash')) targetShell = 'bash';
+  else if (args.includes('--zsh')) targetShell = 'zsh';
+  else if (args.includes('--fish')) targetShell = 'fish';
+  else if (args.includes('--powershell')) targetShell = 'powershell';
+
+  try {
+    const installer = new ShellCompletionInstaller();
+    const result = installer.install(targetShell);
+
+    if (result.alreadyInstalled) {
+      console.log(colored('[OK] Shell completion already installed', 'green'));
+      console.log('');
+      return;
+    }
+
+    console.log(colored('[OK] Shell completion installed successfully!', 'green'));
+    console.log('');
+    console.log(result.message);
+    console.log('');
+    console.log(colored('To activate:', 'cyan'));
+    console.log(`  ${result.reload}`);
+    console.log('');
+    console.log(colored('Then test:', 'cyan'));
+    console.log('  ccs <TAB>        # See available profiles');
+    console.log('  ccs auth <TAB>   # See auth subcommands');
+    console.log('');
+  } catch (error) {
+    console.error(colored('[X] Error:', 'red'), error.message);
+    console.error('');
+    console.error(colored('Usage:', 'yellow'));
+    console.error('  ccs --shell-completion           # Auto-detect shell');
+    console.error('  ccs --shell-completion --bash    # Install for bash');
+    console.error('  ccs --shell-completion --zsh     # Install for zsh');
+    console.error('  ccs --shell-completion --fish    # Install for fish');
+    console.error('  ccs --shell-completion --powershell  # Install for PowerShell');
+    console.error('');
+    process.exit(1);
+  }
+}
+
 // Main execution
 async function main() {
   const args = process.argv.slice(2);
@@ -366,6 +439,12 @@ async function main() {
   // Special case: uninstall command
   if (firstArg === '--uninstall') {
     handleUninstallCommand();
+    return;
+  }
+
+  // Special case: shell completion installer
+  if (firstArg === '--shell-completion') {
+    await handleShellCompletionCommand(args.slice(1));
     return;
   }
 
@@ -443,7 +522,13 @@ async function main() {
       execClaude(claudeCli, remainingArgs);
     }
   } catch (error) {
-    console.error(`[X] ${error.message}`);
+    // Check if this is a profile not found error with suggestions
+    if (error.profileName && error.availableProfiles !== undefined) {
+      const allProfiles = error.availableProfiles.split('\n');
+      ErrorManager.showProfileNotFound(error.profileName, allProfiles, error.suggestions);
+    } else {
+      console.error(`[X] ${error.message}`);
+    }
     process.exit(1);
   }
 }

@@ -1,10 +1,14 @@
 'use strict';
 
 const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const ProfileRegistry = require('./profile-registry');
 const InstanceManager = require('../management/instance-manager');
 const { colored } = require('../utils/helpers');
 const { detectClaudeCli } = require('../utils/claude-detector');
+const { InteractivePrompt } = require('../utils/prompt');
+const CCS_VERSION = require('../../package.json').version;
 
 /**
  * Auth Commands (Simplified)
@@ -45,7 +49,10 @@ class AuthCommands {
     console.log(`  ${colored('ccs "review code"', 'yellow')}                        # Use default profile`);
     console.log('');
     console.log(colored('Options:', 'cyan'));
-    console.log(`  ${colored('--force', 'yellow')}                   Allow overwriting existing profile`);
+    console.log(`  ${colored('--force', 'yellow')}                   Allow overwriting existing profile (create)`);
+    console.log(`  ${colored('--yes, -y', 'yellow')}                 Skip confirmation prompts (remove)`);
+    console.log(`  ${colored('--json', 'yellow')}                    Output in JSON format (list, show)`);
+    console.log(`  ${colored('--verbose', 'yellow')}                 Show additional details (list)`);
     console.log('');
     console.log(colored('Note:', 'cyan'));
     console.log(`  By default, ${colored('ccs', 'yellow')} uses Claude CLI defaults from ~/.claude/`);
@@ -159,12 +166,37 @@ class AuthCommands {
    */
   async handleList(args) {
     const verbose = args.includes('--verbose');
+    const json = args.includes('--json');
 
     try {
       const profiles = this.registry.getAllProfiles();
       const defaultProfile = this.registry.getDefaultProfile();
       const profileNames = Object.keys(profiles);
 
+      // JSON output mode
+      if (json) {
+        const output = {
+          version: CCS_VERSION,
+          profiles: profileNames.map(name => {
+            const profile = profiles[name];
+            const isDefault = name === defaultProfile;
+            const instancePath = this.instanceMgr.getInstancePath(name);
+
+            return {
+              name: name,
+              type: profile.type || 'account',
+              is_default: isDefault,
+              created: profile.created,
+              last_used: profile.last_used || null,
+              instance_path: instancePath
+            };
+          })
+        };
+        console.log(JSON.stringify(output, null, 2));
+        return;
+      }
+
+      // Human-readable output
       if (profileNames.length === 0) {
         console.log(colored('No account profiles found', 'yellow'));
         console.log('');
@@ -234,11 +266,12 @@ class AuthCommands {
    */
   async handleShow(args) {
     const profileName = args.find(arg => !arg.startsWith('--'));
+    const json = args.includes('--json');
 
     if (!profileName) {
       console.error('[X] Profile name is required');
       console.log('');
-      console.log(`Usage: ${colored('ccs auth show <profile>', 'yellow')}`);
+      console.log(`Usage: ${colored('ccs auth show <profile> [--json]', 'yellow')}`);
       process.exit(1);
     }
 
@@ -246,12 +279,41 @@ class AuthCommands {
       const profile = this.registry.getProfile(profileName);
       const defaultProfile = this.registry.getDefaultProfile();
       const isDefault = profileName === defaultProfile;
+      const instancePath = this.instanceMgr.getInstancePath(profileName);
 
+      // Count sessions
+      let sessionCount = 0;
+      try {
+        const sessionsDir = path.join(instancePath, 'session-env');
+        if (fs.existsSync(sessionsDir)) {
+          const files = fs.readdirSync(sessionsDir);
+          sessionCount = files.filter(f => f.endsWith('.json')).length;
+        }
+      } catch (e) {
+        // Ignore errors counting sessions
+      }
+
+      // JSON output mode
+      if (json) {
+        const output = {
+          name: profileName,
+          type: profile.type || 'account',
+          is_default: isDefault,
+          created: profile.created,
+          last_used: profile.last_used || null,
+          instance_path: instancePath,
+          session_count: sessionCount
+        };
+        console.log(JSON.stringify(output, null, 2));
+        return;
+      }
+
+      // Human-readable output
       console.log(colored(`Profile: ${profileName}`, 'bold'));
       console.log('');
       console.log(`  Type: ${profile.type || 'account'}`);
       console.log(`  Default: ${isDefault ? 'Yes' : 'No'}`);
-      console.log(`  Instance: ${this.instanceMgr.getInstancePath(profileName)}`);
+      console.log(`  Instance: ${instancePath}`);
       console.log(`  Created: ${new Date(profile.created).toLocaleString()}`);
 
       if (profile.last_used) {
@@ -273,13 +335,12 @@ class AuthCommands {
    * @param {Array} args - Command arguments
    */
   async handleRemove(args) {
-    const profileName = args.find(arg => !arg.startsWith('--'));
-    const force = args.includes('--force');
+    const profileName = args.find(arg => !arg.startsWith('--') && !arg.startsWith('-'));
 
     if (!profileName) {
       console.error('[X] Profile name is required');
       console.log('');
-      console.log(`Usage: ${colored('ccs auth remove <profile> [--force]', 'yellow')}`);
+      console.log(`Usage: ${colored('ccs auth remove <profile> [--yes]', 'yellow')}`);
       process.exit(1);
     }
 
@@ -288,15 +349,39 @@ class AuthCommands {
       process.exit(1);
     }
 
-    // Require --force for safety
-    if (!force) {
-      console.error('[X] Removal requires --force flag for safety');
-      console.log('');
-      console.log(`Run: ${colored(`ccs auth remove ${profileName} --force`, 'yellow')}`);
-      process.exit(1);
-    }
-
     try {
+      // Get instance path and session count for impact display
+      const instancePath = this.instanceMgr.getInstancePath(profileName);
+      let sessionCount = 0;
+
+      try {
+        const sessionsDir = path.join(instancePath, 'session-env');
+        if (fs.existsSync(sessionsDir)) {
+          const files = fs.readdirSync(sessionsDir);
+          sessionCount = files.filter(f => f.endsWith('.json')).length;
+        }
+      } catch (e) {
+        // Ignore errors counting sessions
+      }
+
+      // Display impact
+      console.log('');
+      console.log(`Profile '${colored(profileName, 'cyan')}' will be permanently deleted.`);
+      console.log(`  Instance path: ${instancePath}`);
+      console.log(`  Sessions: ${sessionCount} conversation${sessionCount !== 1 ? 's' : ''}`);
+      console.log('');
+
+      // Interactive confirmation (or --yes flag)
+      const confirmed = await InteractivePrompt.confirm(
+        'Delete this profile?',
+        { default: false } // Default to NO (safe)
+      );
+
+      if (!confirmed) {
+        console.log('[i] Cancelled');
+        process.exit(0);
+      }
+
       // Delete instance
       this.instanceMgr.deleteInstance(profileName);
 

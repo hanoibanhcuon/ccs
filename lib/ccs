@@ -2,11 +2,31 @@
 set -euo pipefail
 
 # Version (updated by scripts/bump-version.sh)
-CCS_VERSION="3.4.6"
+CCS_VERSION="3.5.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly CONFIG_FILE="${CCS_CONFIG:-$HOME/.ccs/config.json}"
 readonly PROFILES_JSON="$HOME/.ccs/profiles.json"
 readonly INSTANCES_DIR="$HOME/.ccs/instances"
+
+# Determine dependency location (git vs installed)
+# Git: lib/ccs and dependencies are in same dir (lib/)
+# Installed: lib/ccs is symlinked from ~/.local/bin/ccs, dependencies in ~/.ccs/lib/
+if [[ -f "$SCRIPT_DIR/error-codes.sh" ]]; then
+  # Git install - files in same directory
+  DEP_DIR="$SCRIPT_DIR"
+else
+  # Standalone install - files in ~/.ccs/lib/
+  DEP_DIR="$HOME/.ccs/lib"
+fi
+
+# Source error codes
+source "$DEP_DIR/error-codes.sh"
+
+# Source progress indicators
+source "$DEP_DIR/progress-indicator.sh"
+
+# Source interactive prompts
+source "$DEP_DIR/prompt.sh"
 
 # --- Color/Format Functions ---
 setup_colors() {
@@ -27,12 +47,119 @@ setup_colors() {
 
 msg_error() {
   echo "" >&2
-  echo -e "${RED}${BOLD}╔═════════════════════════════════════════════╗${RESET}" >&2
-  echo -e "${RED}${BOLD}║  ERROR                                      ║${RESET}" >&2
-  echo -e "${RED}${BOLD}╚═════════════════════════════════════════════╝${RESET}" >&2
+  echo -e "${RED}${BOLD}=============================================${RESET}" >&2
+  echo -e "${RED}${BOLD}  ERROR${RESET}" >&2
+  echo -e "${RED}${BOLD}=============================================${RESET}" >&2
   echo "" >&2
   echo -e "${RED}$1${RESET}" >&2
   echo "" >&2
+}
+
+# Enhanced error message with error codes
+show_enhanced_error() {
+  local error_code="$1"
+  local short_msg="$2"
+  local context="${3:-}"
+  local suggestions="${4:-}"
+
+  echo "" >&2
+  echo -e "${RED}[X] $short_msg${RESET}" >&2
+  echo "" >&2
+
+  [[ -n "$context" ]] && {
+    echo -e "$context" >&2
+    echo "" >&2
+  }
+
+  [[ -n "$suggestions" ]] && {
+    echo -e "${YELLOW}Solutions:${RESET}" >&2
+    echo -e "$suggestions" >&2
+    echo "" >&2
+  }
+
+  echo -e "${YELLOW}Error: $error_code${RESET}" >&2
+  echo -e "${YELLOW}$(get_error_doc_url "$error_code")${RESET}" >&2
+  echo "" >&2
+}
+
+# Calculate Levenshtein distance between two strings
+levenshtein_distance() {
+  local a="$1"
+  local b="$2"
+  local len_a=${#a}
+  local len_b=${#b}
+
+  # Return early for empty strings
+  [[ $len_a -eq 0 ]] && { echo "$len_b"; return; }
+  [[ $len_b -eq 0 ]] && { echo "$len_a"; return; }
+
+  # Initialize matrix using associative array
+  declare -A matrix
+
+  # Initialize first row and column
+  for ((j=0; j<=len_a; j++)); do
+    matrix[0,$j]=$j
+  done
+  for ((i=0; i<=len_b; i++)); do
+    matrix[$i,0]=$i
+  done
+
+  # Fill matrix
+  for ((i=1; i<=len_b; i++)); do
+    for ((j=1; j<=len_a; j++)); do
+      if [[ "${a:j-1:1}" == "${b:i-1:1}" ]]; then
+        matrix[$i,$j]=${matrix[$((i-1)),$((j-1))]}
+      else
+        local sub=${matrix[$((i-1)),$((j-1))]}
+        local ins=${matrix[$i,$((j-1))]}
+        local del=${matrix[$((i-1)),$j]}
+        local min=$sub
+        [[ $ins -lt $min ]] && min=$ins
+        [[ $del -lt $min ]] && min=$del
+        matrix[$i,$j]=$((min + 1))
+      fi
+    done
+  done
+
+  echo "${matrix[$len_b,$len_a]}"
+}
+
+# Find similar strings using fuzzy matching
+find_similar_strings() {
+  local target="$1"
+  shift
+  local candidates=("$@")
+  local max_distance=2
+  local target_lower="${target,,}"
+
+  declare -A distances
+  local matches=()
+
+  # Calculate distances
+  for candidate in "${candidates[@]}"; do
+    local candidate_lower="${candidate,,}"
+    local dist=$(levenshtein_distance "$target_lower" "$candidate_lower")
+    if [[ $dist -le $max_distance && $dist -gt 0 ]]; then
+      distances["$candidate"]=$dist
+      matches+=("$candidate")
+    fi
+  done
+
+  # Sort by distance (simple bubble sort for small arrays)
+  for ((i=0; i<${#matches[@]}; i++)); do
+    for ((j=i+1; j<${#matches[@]}; j++)); do
+      if [[ ${distances[${matches[i]}]} -gt ${distances[${matches[j]}]} ]]; then
+        local temp="${matches[i]}"
+        matches[i]="${matches[j]}"
+        matches[j]="$temp"
+      fi
+    done
+  done
+
+  # Return first 3 matches
+  for ((i=0; i<${#matches[@]} && i<3; i++)); do
+    echo "${matches[i]}"
+  done
 }
 
 show_help() {
@@ -66,6 +193,7 @@ show_help() {
   echo -e "${CYAN}Flags:${RESET}"
   echo -e "  ${YELLOW}-h, --help${RESET}                  Show this help message"
   echo -e "  ${YELLOW}-v, --version${RESET}               Show version and installation info"
+  echo -e "  ${YELLOW}--shell-completion${RESET}          Install shell auto-completion"
   echo ""
   echo -e "${CYAN}Configuration:${RESET}"
   echo -e "  Config:    ~/.ccs/config.json"
@@ -77,6 +205,22 @@ show_help() {
   echo -e "  Commands:  ~/.ccs/shared/commands/"
   echo -e "  Skills:    ~/.ccs/shared/skills/"
   echo -e "  Note: Commands, skills, and agents are symlinked across all profiles"
+  echo ""
+  echo -e "${CYAN}Examples:${RESET}"
+  echo -e "  Quick start:"
+  echo -e "    ${YELLOW}\$ ccs${RESET}                        # Use default account"
+  echo -e "    ${YELLOW}\$ ccs glm \"implement API\"${RESET}    # Cost-optimized model"
+  echo ""
+  echo -e "  Multi-account workflow:"
+  echo -e "    ${YELLOW}\$ ccs auth create work${RESET}       # Create work profile"
+  echo -e "    ${YELLOW}\$ ccs work \"review PR\"${RESET}       # Use work account"
+  echo ""
+  echo -e "  For more: ${CYAN}https://github.com/kaitranntt/ccs#usage${RESET}"
+  echo ""
+  echo -e "${YELLOW}Uninstall:${RESET}"
+  echo "  npm:          npm uninstall -g @kaitranntt/ccs"
+  echo "  macOS/Linux:  curl -fsSL ccs.kaitran.ca/uninstall | bash"
+  echo "  Windows:      irm ccs.kaitran.ca/uninstall | iex"
   echo ""
   echo -e "${CYAN}Documentation:${RESET}"
   echo -e "  GitHub:  ${CYAN}https://github.com/kaitranntt/ccs${RESET}"
@@ -189,96 +333,137 @@ doctor_run() {
   echo ""
 
   local has_errors=false
+  local total_checks=9
+  local current_check=0
 
   # Check Claude CLI
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking Claude CLI"
   if command -v "$(detect_claude_cli)" &>/dev/null; then
+    clear_progress
     doctor_check "Claude CLI" "success"
   else
+    clear_progress
     doctor_check "Claude CLI" "error" "Not found in PATH"
     has_errors=true
   fi
 
   # Check ~/.ccs/
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking CCS directory"
   if [[ -d "$HOME/.ccs" ]]; then
+    clear_progress
     doctor_check "CCS Directory" "success"
   else
+    clear_progress
     doctor_check "CCS Directory" "error" "~/.ccs/ not found"
     has_errors=true
   fi
 
   # Check config.json
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking config.json"
   if [[ -f "$CONFIG_FILE" ]]; then
     if jq empty "$CONFIG_FILE" 2>/dev/null; then
+      clear_progress
       doctor_check "config.json" "success"
     else
+      clear_progress
       doctor_check "config.json" "error" "Invalid JSON"
       has_errors=true
     fi
   else
+    clear_progress
     doctor_check "config.json" "error" "Not found"
     has_errors=true
   fi
 
   # Check glm.settings.json
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking glm.settings.json"
   local glm_file="$HOME/.ccs/glm.settings.json"
   if [[ -f "$glm_file" ]]; then
     if jq empty "$glm_file" 2>/dev/null; then
+      clear_progress
       doctor_check "glm.settings.json" "success"
     else
+      clear_progress
       doctor_check "glm.settings.json" "error" "Invalid JSON"
       has_errors=true
     fi
   else
+    clear_progress
     doctor_check "glm.settings.json" "error" "Not found"
     has_errors=true
   fi
 
   # Check kimi.settings.json
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking kimi.settings.json"
   local kimi_file="$HOME/.ccs/kimi.settings.json"
   if [[ -f "$kimi_file" ]]; then
     if jq empty "$kimi_file" 2>/dev/null; then
+      clear_progress
       doctor_check "kimi.settings.json" "success"
     else
+      clear_progress
       doctor_check "kimi.settings.json" "error" "Invalid JSON"
       has_errors=true
     fi
   else
+    clear_progress
     doctor_check "kimi.settings.json" "error" "Not found"
     has_errors=true
   fi
 
   # Check ~/.claude/settings.json
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking Claude settings"
   if [[ -f "$HOME/.claude/settings.json" ]]; then
     if jq empty "$HOME/.claude/settings.json" 2>/dev/null; then
+      clear_progress
       doctor_check "Claude Settings" "success"
     else
+      clear_progress
       doctor_check "Claude Settings" "warning" "Invalid JSON"
     fi
   else
+    clear_progress
     doctor_check "Claude Settings" "warning" "Not found - run 'claude /login'"
   fi
 
   # Check profiles
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking profiles"
   if [[ -f "$CONFIG_FILE" ]]; then
     local profile_count=$(jq -r '.profiles | length' "$CONFIG_FILE" 2>/dev/null || echo "0")
+    clear_progress
     doctor_check "Profiles" "success" "($profile_count configured)"
   fi
 
   # Check instances
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking instances"
   if [[ -d "$INSTANCES_DIR" ]]; then
     local instance_count=$(find "$INSTANCES_DIR" -maxdepth 1 -type d 2>/dev/null | wc -l)
     instance_count=$((instance_count - 1))  # Exclude parent dir
+    clear_progress
     doctor_check "Instances" "success" "($instance_count account profiles)"
   else
+    clear_progress
     doctor_check "Instances" "success" "(no account profiles)"
   fi
 
   # Check permissions
+  current_check=$((current_check + 1))
+  show_progress_step $current_check $total_checks "Checking permissions"
   local test_file="$HOME/.ccs/.permission-test"
   if echo "test" > "$test_file" 2>/dev/null; then
     rm -f "$test_file" 2>/dev/null
+    clear_progress
     doctor_check "Permissions" "success"
   else
+    clear_progress
     doctor_check "Permissions" "error" "Cannot write to ~/.ccs/"
     has_errors=true
   fi
@@ -629,6 +814,27 @@ ensure_instance() {
 # --- Profile Detection Logic (Phase 1) ---
 
 # List available profiles for error messages
+# Get all profile names (for fuzzy matching)
+get_all_profile_names() {
+  local names=()
+
+  # Settings-based profiles
+  if [[ -f "$CONFIG_FILE" ]]; then
+    while IFS= read -r name; do
+      names+=("$name")
+    done < <(jq -r '.profiles | keys[]' "$CONFIG_FILE" 2>/dev/null || true)
+  fi
+
+  # Account-based profiles
+  if [[ -f "$PROFILES_JSON" ]]; then
+    while IFS= read -r name; do
+      names+=("$name")
+    done < <(jq -r '.profiles | keys[]' "$PROFILES_JSON" 2>/dev/null || true)
+  fi
+
+  printf '%s\n' "${names[@]}"
+}
+
 list_available_profiles() {
   local lines=()
 
@@ -745,6 +951,12 @@ auth_help() {
   echo -e "  ${YELLOW}ccs work \"review code\"${RESET}                   # Use work profile"
   echo -e "  ${YELLOW}ccs \"review code\"${RESET}                        # Use default profile"
   echo ""
+  echo -e "${CYAN}Options:${RESET}"
+  echo -e "  ${YELLOW}--force${RESET}                   Allow overwriting existing profile (create)"
+  echo -e "  ${YELLOW}--yes, -y${RESET}                 Skip confirmation prompts (remove)"
+  echo -e "  ${YELLOW}--json${RESET}                    Output in JSON format (list, show)"
+  echo -e "  ${YELLOW}--verbose${RESET}                 Show additional details (list)"
+  echo ""
   echo -e "${CYAN}Note:${RESET}"
   echo -e "  By default, ${YELLOW}ccs${RESET} uses Claude CLI defaults from ~/.claude/"
   echo -e "  Use ${YELLOW}ccs auth default <profile>${RESET} to change the default profile."
@@ -816,10 +1028,24 @@ auth_create() {
 
 auth_list() {
   local verbose=false
-  [[ "${1:-}" == "--verbose" ]] && verbose=true
+  local json=false
+
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --verbose) verbose=true ;;
+      --json) json=true ;;
+      *) ;;
+    esac
+    shift
+  done
 
   # Read profiles.json
   [[ ! -f "$PROFILES_JSON" ]] && {
+    if $json; then
+      echo "{\"version\":\"$CCS_VERSION\",\"profiles\":[]}"
+      return 0
+    fi
     echo -e "${YELLOW}No account profiles found${RESET}"
     echo ""
     echo "To create your first profile:"
@@ -827,8 +1053,32 @@ auth_list() {
     return 0
   }
 
-  local profiles=$(jq -r '.profiles | keys[]' "$PROFILES_JSON" 2>/dev/null || true)
   local default_profile=$(jq -r '.default // empty' "$PROFILES_JSON" 2>/dev/null || true)
+
+  # JSON output mode
+  if $json; then
+    jq -n \
+      --arg version "$CCS_VERSION" \
+      --arg default "$default_profile" \
+      --argjson data "$(cat "$PROFILES_JSON")" \
+      '{
+        version: $version,
+        profiles: [
+          $data.profiles | to_entries[] | {
+            name: .key,
+            type: (.value.type // "account"),
+            is_default: (.key == $default),
+            created: .value.created,
+            last_used: (.value.last_used // null),
+            instance_path: ($ENV.INSTANCES_DIR + "/" + .key)
+          }
+        ]
+      }'
+    return 0
+  fi
+
+  # Human-readable output
+  local profiles=$(jq -r '.profiles | keys[]' "$PROFILES_JSON" 2>/dev/null || true)
 
   [[ -z "$profiles" ]] && {
     echo -e "${YELLOW}No account profiles found${RESET}"
@@ -864,11 +1114,22 @@ auth_list() {
 }
 
 auth_show() {
-  local profile_name="${1:-}"
+  local profile_name=""
+  local json=false
+
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json=true ;;
+      -*) msg_error "Unknown option: $1"; return 1 ;;
+      *) profile_name="$1" ;;
+    esac
+    shift
+  done
 
   [[ -z "$profile_name" ]] && {
     msg_error "Profile name is required"
-    echo "Usage: ${YELLOW}ccs auth show <profile>${RESET}"
+    echo "Usage: ${YELLOW}ccs auth show <profile> [--json]${RESET}"
     return 1
   }
 
@@ -882,29 +1143,59 @@ auth_show() {
   local is_default=false
   [[ "$profile_name" == "$default_profile" ]] && is_default=true
 
-  echo -e "${BOLD}Profile: $profile_name${RESET}"
-  echo ""
-
   local type=$(jq -r ".profiles.\"$profile_name\".type // \"account\"" "$PROFILES_JSON" 2>/dev/null || true)
   local created=$(jq -r ".profiles.\"$profile_name\".created" "$PROFILES_JSON" 2>/dev/null || true)
-  local last_used=$(jq -r ".profiles.\"$profile_name\".last_used // \"Never\"" "$PROFILES_JSON" 2>/dev/null || true)
+  local last_used=$(jq -r ".profiles.\"$profile_name\".last_used // null" "$PROFILES_JSON" 2>/dev/null || true)
   local instance_path="$INSTANCES_DIR/$(sanitize_profile_name "$profile_name")"
+
+  # Count sessions
+  local session_count=0
+  if [[ -d "$instance_path/session-env" ]]; then
+    session_count=$(find "$instance_path/session-env" -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
+  fi
+
+  # JSON output mode
+  if $json; then
+    jq -n \
+      --arg name "$profile_name" \
+      --arg type "$type" \
+      --argjson is_default "$is_default" \
+      --arg created "$created" \
+      --arg last_used "$last_used" \
+      --arg instance_path "$instance_path" \
+      --argjson session_count "$session_count" \
+      '{
+        name: $name,
+        type: $type,
+        is_default: $is_default,
+        created: $created,
+        last_used: $last_used,
+        instance_path: $instance_path,
+        session_count: $session_count
+      }'
+    return 0
+  fi
+
+  # Human-readable output
+  echo -e "${BOLD}Profile: $profile_name${RESET}"
+  echo ""
 
   echo "  Type: $type"
   echo "  Default: $($is_default && echo "Yes" || echo "No")"
   echo "  Instance: $instance_path"
   echo "  Created: $created"
-  echo "  Last used: $last_used"
+  [[ "$last_used" != "null" ]] && echo "  Last used: $last_used" || echo "  Last used: Never"
   echo ""
 }
 
 auth_remove() {
   local profile_name=""
-  local force=false
 
+  # Parse arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --force) force=true ;;
+      --yes|-y) export CCS_YES=1 ;;  # Auto-confirm (export for confirm_action)
+      -*) msg_error "Unknown option: $1"; return 1 ;;
       *) profile_name="$1" ;;
     esac
     shift
@@ -912,7 +1203,8 @@ auth_remove() {
 
   [[ -z "$profile_name" ]] && {
     msg_error "Profile name is required"
-    echo "Usage: ${YELLOW}ccs auth remove <profile> --force${RESET}"
+    echo ""
+    echo "Usage: ${YELLOW}ccs auth remove <profile> [--yes]${RESET}"
     return 1
   }
 
@@ -921,14 +1213,28 @@ auth_remove() {
     return 1
   }
 
-  $force || {
-    msg_error "Removal requires --force flag for safety"
-    echo "Run: ${YELLOW}ccs auth remove $profile_name --force${RESET}"
-    return 1
-  }
+  # Get instance path and session count for impact display
+  local instance_path="$INSTANCES_DIR/$(sanitize_profile_name "$profile_name")"
+  local session_count=0
+
+  if [[ -d "$instance_path/session-env" ]]; then
+    session_count=$(find "$instance_path/session-env" -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
+  fi
+
+  # Display impact
+  echo ""
+  echo "Profile '${CYAN}$profile_name${RESET}' will be permanently deleted."
+  echo "  Instance path: $instance_path"
+  echo "  Sessions: $session_count conversation$([ "$session_count" -ne 1 ] && echo "s" || echo "")"
+  echo ""
+
+  # Interactive confirmation (or --yes flag)
+  if ! confirm_action "Delete this profile?" "no"; then
+    echo "[i] Cancelled"
+    return 0
+  fi
 
   # Delete instance directory
-  local instance_path="$INSTANCES_DIR/$(sanitize_profile_name "$profile_name")"
   rm -rf "$instance_path"
 
   # Remove from registry
@@ -979,6 +1285,184 @@ handle_auth_commands() {
   esac
 }
 
+# --- Shell Completion Installer ---
+
+install_shell_completion() {
+  shift  # Remove --shell-completion
+
+  echo -e "${BOLD}Shell Completion Installer${RESET}"
+  echo ""
+
+  # Parse flags for manual shell selection
+  local target_shell=""
+  for arg in "$@"; do
+    case "$arg" in
+      --bash) target_shell="bash" ;;
+      --zsh) target_shell="zsh" ;;
+      --fish) target_shell="fish" ;;
+      *) ;;
+    esac
+  done
+
+  # Auto-detect shell if not specified
+  if [[ -z "$target_shell" ]]; then
+    if [[ -n "$BASH_VERSION" ]]; then
+      target_shell="bash"
+    elif [[ -n "$ZSH_VERSION" ]]; then
+      target_shell="zsh"
+    elif [[ -n "$FISH_VERSION" ]]; then
+      target_shell="fish"
+    else
+      echo -e "${RED}[X] Could not detect shell${RESET}" >&2
+      echo "" >&2
+      echo -e "${YELLOW}Usage:${RESET}" >&2
+      echo "  ccs --shell-completion           # Auto-detect shell" >&2
+      echo "  ccs --shell-completion --bash    # Install for bash" >&2
+      echo "  ccs --shell-completion --zsh     # Install for zsh" >&2
+      echo "  ccs --shell-completion --fish    # Install for fish" >&2
+      echo "" >&2
+      return 1
+    fi
+  fi
+
+  # Ensure completion files exist in ~/.ccs/completions/
+  local completions_dir="$HOME/.ccs/completions"
+  if [[ ! -d "$completions_dir" ]]; then
+    mkdir -p "$completions_dir"
+  fi
+
+  # Copy from scripts if not present
+  local script_dir="$(dirname "$0")"
+  if [[ -f "$script_dir/../scripts/completion/ccs.bash" ]]; then
+    cp "$script_dir/../scripts/completion/ccs.bash" "$completions_dir/" 2>/dev/null || true
+    cp "$script_dir/../scripts/completion/ccs.zsh" "$completions_dir/" 2>/dev/null || true
+    cp "$script_dir/../scripts/completion/ccs.fish" "$completions_dir/" 2>/dev/null || true
+  fi
+
+  # Install based on target shell
+  case "$target_shell" in
+    bash)
+      local rc_file="$HOME/.bashrc"
+      local completion_file="$completions_dir/ccs.bash"
+      local marker="# CCS shell completion"
+
+      if [[ ! -f "$completion_file" ]]; then
+        echo -e "${RED}[X] Completion file not found: $completion_file${RESET}" >&2
+        echo "    Please reinstall CCS." >&2
+        return 1
+      fi
+
+      # Check if already installed
+      if grep -q "$marker" "$rc_file" 2>/dev/null; then
+        echo -e "${GREEN}[OK] Shell completion already installed${RESET}"
+        echo ""
+        return 0
+      fi
+
+      # Append to .bashrc
+      {
+        echo ""
+        echo "$marker"
+        echo "source \"$completion_file\""
+      } >> "$rc_file"
+
+      echo -e "${GREEN}[OK] Shell completion installed successfully!${RESET}"
+      echo ""
+      echo "Added to $rc_file"
+      echo ""
+      echo -e "${CYAN}To activate:${RESET}"
+      echo "  source ~/.bashrc"
+      echo ""
+      echo -e "${CYAN}Then test:${RESET}"
+      echo "  ccs <TAB>        # See available profiles"
+      echo "  ccs auth <TAB>   # See auth subcommands"
+      echo ""
+      ;;
+
+    zsh)
+      local rc_file="$HOME/.zshrc"
+      local completion_dir="$HOME/.zsh/completion"
+      local completion_file="$completions_dir/ccs.zsh"
+      local marker="# CCS shell completion"
+
+      if [[ ! -f "$completion_file" ]]; then
+        echo -e "${RED}[X] Completion file not found: $completion_file${RESET}" >&2
+        echo "    Please reinstall CCS." >&2
+        return 1
+      fi
+
+      # Create zsh completion directory
+      mkdir -p "$completion_dir"
+
+      # Copy to zsh completion directory
+      cp "$completion_file" "$completion_dir/_ccs"
+
+      # Check if already installed
+      if grep -q "$marker" "$rc_file" 2>/dev/null; then
+        echo -e "${GREEN}[OK] Shell completion already installed${RESET}"
+        echo ""
+        return 0
+      fi
+
+      # Append to .zshrc
+      {
+        echo ""
+        echo "$marker"
+        echo "fpath=(~/.zsh/completion \$fpath)"
+        echo "autoload -Uz compinit && compinit"
+      } >> "$rc_file"
+
+      echo -e "${GREEN}[OK] Shell completion installed successfully!${RESET}"
+      echo ""
+      echo "Added to $rc_file"
+      echo ""
+      echo -e "${CYAN}To activate:${RESET}"
+      echo "  source ~/.zshrc"
+      echo ""
+      echo -e "${CYAN}Then test:${RESET}"
+      echo "  ccs <TAB>        # See available profiles"
+      echo "  ccs auth <TAB>   # See auth subcommands"
+      echo ""
+      ;;
+
+    fish)
+      local fish_dir="$HOME/.config/fish/completions"
+      local completion_file="$completions_dir/ccs.fish"
+
+      if [[ ! -f "$completion_file" ]]; then
+        echo -e "${RED}[X] Completion file not found: $completion_file${RESET}" >&2
+        echo "    Please reinstall CCS." >&2
+        return 1
+      fi
+
+      # Create fish completion directory
+      mkdir -p "$fish_dir"
+
+      # Copy to fish completion directory (fish auto-loads from here)
+      cp "$completion_file" "$fish_dir/ccs.fish"
+
+      echo -e "${GREEN}[OK] Shell completion installed successfully!${RESET}"
+      echo ""
+      echo "Installed to $fish_dir/ccs.fish"
+      echo ""
+      echo -e "${CYAN}To activate:${RESET}"
+      echo "  Fish auto-loads completions (no reload needed)"
+      echo ""
+      echo -e "${CYAN}Then test:${RESET}"
+      echo "  ccs <TAB>        # See available profiles"
+      echo "  ccs auth <TAB>   # See auth subcommands"
+      echo ""
+      ;;
+
+    *)
+      echo -e "${RED}[X] Unsupported shell: $target_shell${RESET}" >&2
+      return 1
+      ;;
+  esac
+
+  return 0
+}
+
 # --- Main Execution Logic ---
 
 # Special case: version command (check BEFORE profile detection)
@@ -996,6 +1480,12 @@ fi
 # Special case: auth commands
 if [[ $# -gt 0 ]] && [[ "${1}" == "auth" ]]; then
   handle_auth_commands "$@"
+  exit $?
+fi
+
+# Special case: shell completion installer
+if [[ $# -gt 0 ]] && [[ "${1}" == "--shell-completion" ]]; then
+  install_shell_completion "$@"
   exit $?
 fi
 
@@ -1030,10 +1520,36 @@ fi
 
 # Detect profile type
 if ! detect_profile_type "$PROFILE"; then
-  msg_error "Profile '$PROFILE' not found
+  # Get suggestions using fuzzy matching
+  mapfile -t all_profiles < <(get_all_profile_names)
+  mapfile -t suggestions < <(find_similar_strings "$PROFILE" "${all_profiles[@]}")
 
-Available profiles:
-$(list_available_profiles)"
+  echo "" >&2
+  echo -e "${RED}[X] Profile '$PROFILE' not found${RESET}" >&2
+  echo "" >&2
+
+  # Show suggestions if any
+  if [[ ${#suggestions[@]} -gt 0 ]]; then
+    echo -e "${YELLOW}Did you mean:${RESET}" >&2
+    for suggestion in "${suggestions[@]}"; do
+      echo "  $suggestion" >&2
+    done
+    echo "" >&2
+  fi
+
+  echo -e "${CYAN}Available profiles:${RESET}" >&2
+  list_available_profiles >&2
+  echo "" >&2
+  echo -e "${YELLOW}Solutions:${RESET}" >&2
+  echo "  # Use existing profile" >&2
+  echo "  ccs <profile> \"your prompt\"" >&2
+  echo "" >&2
+  echo "  # Create new account profile" >&2
+  echo "  ccs auth create <name>" >&2
+  echo "" >&2
+  echo -e "${YELLOW}Error: $E_PROFILE_NOT_FOUND${RESET}" >&2
+  echo -e "${YELLOW}$(get_error_doc_url "$E_PROFILE_NOT_FOUND")${RESET}" >&2
+  echo "" >&2
   exit 1
 fi
 

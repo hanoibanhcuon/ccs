@@ -12,11 +12,31 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Version (updated by scripts/bump-version.sh)
-$CcsVersion = "3.4.6"
+$CcsVersion = "3.5.0"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigFile = if ($env:CCS_CONFIG) { $env:CCS_CONFIG } else { "$env:USERPROFILE\.ccs\config.json" }
 $ProfilesJson = "$env:USERPROFILE\.ccs\profiles.json"
 $InstancesDir = "$env:USERPROFILE\.ccs\instances"
+
+# Determine dependency location (git vs installed)
+# Git: lib/ccs.ps1 and dependencies are in same dir (lib/)
+# Installed: lib/ccs.ps1 is in ~/.ccs/, dependencies in ~/.ccs/lib/
+$DepDir = if (Test-Path "$ScriptDir\error-codes.ps1") {
+    # Git install - files in same directory
+    $ScriptDir
+} else {
+    # Standalone install - files in ~/.ccs/lib/
+    "$env:USERPROFILE\.ccs\lib"
+}
+
+# Source error codes
+. "$DepDir\error-codes.ps1"
+
+# Source progress indicators
+. "$DepDir\progress-indicator.ps1"
+
+# Source interactive prompts
+. "$DepDir\prompt.ps1"
 
 # --- Color/Format Functions ---
 function Write-ErrorMsg {
@@ -27,6 +47,104 @@ function Write-ErrorMsg {
     Write-Host "=============================================" -ForegroundColor Red
     Write-Host ""
     Write-Host $Message -ForegroundColor Red
+    Write-Host ""
+}
+
+# Calculate Levenshtein distance between two strings
+function Get-LevenshteinDistance {
+    param(
+        [string]$a,
+        [string]$b
+    )
+
+    $lenA = $a.Length
+    $lenB = $b.Length
+
+    if ($lenA -eq 0) { return $lenB }
+    if ($lenB -eq 0) { return $lenA }
+
+    # Initialize matrix
+    $matrix = New-Object 'int[,]' ($lenB + 1), ($lenA + 1)
+
+    # Initialize first row and column
+    for ($i = 0; $i -le $lenB; $i++) {
+        $matrix[$i, 0] = $i
+    }
+    for ($j = 0; $j -le $lenA; $j++) {
+        $matrix[0, $j] = $j
+    }
+
+    # Fill matrix
+    for ($i = 1; $i -le $lenB; $i++) {
+        for ($j = 1; $j -le $lenA; $j++) {
+            if ($a[$j - 1] -eq $b[$i - 1]) {
+                $matrix[$i, $j] = $matrix[$i - 1, $j - 1]
+            } else {
+                $sub = $matrix[$i - 1, $j - 1]
+                $ins = $matrix[$i, $j - 1]
+                $del = $matrix[$i - 1, $j]
+                $min = [Math]::Min([Math]::Min($sub, $ins), $del)
+                $matrix[$i, $j] = $min + 1
+            }
+        }
+    }
+
+    return $matrix[$lenB, $lenA]
+}
+
+# Find similar strings using fuzzy matching
+function Find-SimilarStrings {
+    param(
+        [string]$Target,
+        [string[]]$Candidates,
+        [int]$MaxDistance = 2
+    )
+
+    $targetLower = $Target.ToLower()
+    $matches = @()
+
+    foreach ($candidate in $Candidates) {
+        $candidateLower = $candidate.ToLower()
+        $distance = Get-LevenshteinDistance $targetLower $candidateLower
+
+        if ($distance -le $MaxDistance -and $distance -gt 0) {
+            $matches += [PSCustomObject]@{
+                Name = $candidate
+                Distance = $distance
+            }
+        }
+    }
+
+    # Sort by distance and return top 3
+    return $matches | Sort-Object Distance | Select-Object -First 3 | ForEach-Object { $_.Name }
+}
+
+# Enhanced error message with error codes
+function Show-EnhancedError {
+    param(
+        [string]$ErrorCode,
+        [string]$ShortMsg,
+        [string]$Context = "",
+        [string]$Suggestions = ""
+    )
+
+    Write-Host ""
+    Write-Host "[X] $ShortMsg" -ForegroundColor Red
+    Write-Host ""
+
+    if ($Context) {
+        Write-Host $Context
+        Write-Host ""
+    }
+
+    if ($Suggestions) {
+        Write-Host "Solutions:" -ForegroundColor Yellow
+        Write-Host $Suggestions
+        Write-Host ""
+    }
+
+    Write-Host "Error: $ErrorCode" -ForegroundColor Yellow
+    Write-Host (Get-ErrorDocUrl $ErrorCode) -ForegroundColor Yellow
     Write-Host ""
 }
 
@@ -111,6 +229,19 @@ function Show-Help {
     Write-ColorLine "  ccs kimi                    Switch to Kimi for Coding" "Yellow"
     Write-ColorLine "  ccs glm 'debug this code'   Use GLM and run command" "Yellow"
     Write-Host ""
+    Write-ColorLine "Examples:" "Cyan"
+    Write-Host "  Quick start:"
+    Write-ColorLine "    `$ ccs" "Yellow" -NoNewline
+    Write-Host "                        # Use default account"
+    Write-ColorLine "    `$ ccs glm `"implement API`"" "Yellow" -NoNewline
+    Write-Host "    # Cost-optimized model"
+    Write-Host ""
+    Write-Host "  Profile usage:"
+    Write-ColorLine "    `$ ccs work `"debug code`"" "Yellow" -NoNewline
+    Write-Host "      # Switch to work profile"
+    Write-ColorLine "    `$ ccs personal" "Yellow" -NoNewline
+    Write-Host "                # Open personal account"
+    Write-Host ""
     Write-ColorLine "Account Management:" "Cyan"
     Write-ColorLine "  ccs auth --help             Manage multiple Claude accounts" "Yellow"
     Write-ColorLine "  ccs work                    Switch to work account" "Yellow"
@@ -122,6 +253,7 @@ function Show-Help {
     Write-ColorLine "Flags:" "Cyan"
     Write-ColorLine "  -h, --help                  Show this help message" "Yellow"
     Write-ColorLine "  -v, --version               Show version and installation info" "Yellow"
+    Write-ColorLine "  --shell-completion          Install shell auto-completion" "Yellow"
     Write-Host ""
     Write-ColorLine "Configuration:" "Cyan"
     Write-Host "  Config:    ~/.ccs/config.json"
@@ -585,6 +717,28 @@ function Ensure-Instance {
 
 # --- Profile Detection Logic (Phase 1) ---
 
+function Get-AllProfileNames {
+    $names = @()
+
+    # Settings-based profiles
+    if (Test-Path $ConfigFile) {
+        try {
+            $Config = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+            $names += $Config.profiles.PSObject.Properties.Name
+        } catch {}
+    }
+
+    # Account-based profiles
+    if (Test-Path $ProfilesJson) {
+        try {
+            $Profiles = Read-ProfilesJson
+            $names += $Profiles.profiles.PSObject.Properties.Name
+        } catch {}
+    }
+
+    return $names
+}
+
 function Get-AvailableProfiles {
     $lines = @()
 
@@ -718,6 +872,12 @@ function Show-AuthHelp {
     Write-Host '  ccs work "review code"                   # Use work profile' -ForegroundColor Yellow
     Write-Host '  ccs "review code"                        # Use default profile' -ForegroundColor Yellow
     Write-Host ""
+    Write-Host "Options:" -ForegroundColor Cyan
+    Write-Host "  --force                   Allow overwriting existing profile (create)" -ForegroundColor Yellow
+    Write-Host "  --yes, -y                 Skip confirmation prompts (remove)" -ForegroundColor Yellow
+    Write-Host "  --json                    Output in JSON format (list, show)" -ForegroundColor Yellow
+    Write-Host "  --verbose                 Show additional details (list)" -ForegroundColor Yellow
+    Write-Host ""
     Write-Host "Note:" -ForegroundColor Cyan
     Write-Host "  By default, " -NoNewline
     Write-Host "ccs" -ForegroundColor Yellow -NoNewline
@@ -796,8 +956,13 @@ function Invoke-AuthList {
     param([string[]]$Args)
 
     $Verbose = $Args -contains "--verbose"
+    $Json = $Args -contains "--json"
 
     if (-not (Test-Path $ProfilesJson)) {
+        if ($Json) {
+            Write-Output "{`"version`":`"$CcsVersion`",`"profiles`":[]}"
+            return
+        }
         Write-Host "No account profiles found" -ForegroundColor Yellow
         Write-Host ""
         Write-Host "To create your first profile:"
@@ -809,10 +974,45 @@ function Invoke-AuthList {
     $Profiles = $Data.profiles.PSObject.Properties.Name
 
     if ($Profiles.Count -eq 0) {
+        if ($Json) {
+            Write-Output "{`"version`":`"$CcsVersion`",`"profiles`":[]}"
+            return
+        }
         Write-Host "No account profiles found" -ForegroundColor Yellow
         return
     }
 
+    # JSON output mode
+    if ($Json) {
+        $ProfilesList = @()
+        foreach ($profile in $Profiles) {
+            $IsDefault = $profile -eq $Data.default
+            $Type = $Data.profiles.$profile.type
+            if (-not $Type) { $Type = "account" }
+            $Created = $Data.profiles.$profile.created
+            $LastUsed = $Data.profiles.$profile.last_used
+            $InstancePath = "$InstancesDir\$(Get-SanitizedProfileName $profile)"
+
+            $ProfilesList += @{
+                name = $profile
+                type = $Type
+                is_default = $IsDefault
+                created = $Created
+                last_used = $LastUsed
+                instance_path = $InstancePath
+            }
+        }
+
+        $Output = @{
+            version = $CcsVersion
+            profiles = $ProfilesList
+        }
+
+        Write-Output ($Output | ConvertTo-Json -Depth 10)
+        return
+    }
+
+    # Human-readable output
     Write-Host "Saved Account Profiles:" -ForegroundColor White
     Write-Host ""
 
@@ -846,10 +1046,26 @@ function Invoke-AuthList {
 function Invoke-AuthShow {
     param([string[]]$Args)
 
-    $ProfileName = $Args[0]
+    $ProfileName = ""
+    $Json = $false
+
+    # Parse arguments
+    foreach ($arg in $Args) {
+        if ($arg -eq "--json") {
+            $Json = $true
+        } elseif ($arg -like "-*") {
+            Write-ErrorMsg "Unknown option: $arg"
+            return 1
+        } else {
+            $ProfileName = $arg
+        }
+    }
 
     if (-not $ProfileName) {
-        Write-ErrorMsg "Profile name is required`nUsage: ccs auth show <profile>"
+        Write-ErrorMsg "Profile name is required"
+        Write-Host ""
+        Write-Host "Usage: " -NoNewline
+        Write-Host "ccs auth show <profile> [--json]" -ForegroundColor Yellow
         return 1
     }
 
@@ -861,20 +1077,48 @@ function Invoke-AuthShow {
     $Data = Read-ProfilesJson
     $IsDefault = $ProfileName -eq $Data.default
 
-    Write-Host "Profile: $ProfileName" -ForegroundColor White
-    Write-Host ""
-
     $Type = $Data.profiles.$ProfileName.type
+    if (-not $Type) { $Type = "account" }
     $Created = $Data.profiles.$ProfileName.created
     $LastUsed = $Data.profiles.$ProfileName.last_used
-    if (-not $LastUsed) { $LastUsed = "Never" }
     $InstancePath = "$InstancesDir\$(Get-SanitizedProfileName $ProfileName)"
+
+    # Count sessions
+    $SessionCount = 0
+    if (Test-Path "$InstancePath\session-env") {
+        $SessionFiles = Get-ChildItem "$InstancePath\session-env" -Filter "*.json" -ErrorAction SilentlyContinue
+        $SessionCount = $SessionFiles.Count
+    }
+
+    # JSON output mode
+    if ($Json) {
+        $Output = @{
+            name = $ProfileName
+            type = $Type
+            is_default = $IsDefault
+            created = $Created
+            last_used = $LastUsed
+            instance_path = $InstancePath
+            session_count = $SessionCount
+        }
+
+        Write-Output ($Output | ConvertTo-Json -Depth 10)
+        return
+    }
+
+    # Human-readable output
+    Write-Host "Profile: $ProfileName" -ForegroundColor White
+    Write-Host ""
 
     Write-Host "  Type: $Type"
     Write-Host "  Default: $(if ($IsDefault) { 'Yes' } else { 'No' })"
     Write-Host "  Instance: $InstancePath"
     Write-Host "  Created: $Created"
-    Write-Host "  Last used: $LastUsed"
+    if ($LastUsed) {
+        Write-Host "  Last used: $LastUsed"
+    } else {
+        Write-Host "  Last used: Never"
+    }
     Write-Host ""
 }
 
@@ -882,18 +1126,24 @@ function Invoke-AuthRemove {
     param([string[]]$Args)
 
     $ProfileName = ""
-    $Force = $false
 
+    # Parse arguments
     foreach ($arg in $Args) {
-        if ($arg -eq "--force") {
-            $Force = $true
+        if ($arg -eq "--yes" -or $arg -eq "-y") {
+            $env:CCS_YES = "1"  # Auto-confirm
+        } elseif ($arg -like "-*") {
+            Write-ErrorMsg "Unknown option: $arg"
+            return 1
         } else {
             $ProfileName = $arg
         }
     }
 
     if (-not $ProfileName) {
-        Write-ErrorMsg "Profile name is required`nUsage: ccs auth remove <profile> --force"
+        Write-ErrorMsg "Profile name is required"
+        Write-Host ""
+        Write-Host "Usage: " -NoNewline
+        Write-Host "ccs auth remove <profile> [--yes]" -ForegroundColor Yellow
         return 1
     }
 
@@ -902,13 +1152,33 @@ function Invoke-AuthRemove {
         return 1
     }
 
-    if (-not $Force) {
-        Write-ErrorMsg "Removal requires --force flag for safety`nRun: ccs auth remove $ProfileName --force"
-        return 1
+    # Get instance path and session count for impact display
+    $InstancePath = "$InstancesDir\$(Get-SanitizedProfileName $ProfileName)"
+    $SessionCount = 0
+
+    if (Test-Path "$InstancePath\session-env") {
+        $SessionFiles = Get-ChildItem "$InstancePath\session-env" -Filter "*.json" -ErrorAction SilentlyContinue
+        $SessionCount = $SessionFiles.Count
+    }
+
+    # Display impact
+    Write-Host ""
+    Write-Host "Profile '" -NoNewline
+    Write-Host $ProfileName -ForegroundColor Cyan -NoNewline
+    Write-Host "' will be permanently deleted."
+    Write-Host "  Instance path: $InstancePath"
+    Write-Host "  Sessions: $SessionCount conversation$(if ($SessionCount -ne 1) { 's' } else { '' })"
+    Write-Host ""
+
+    # Interactive confirmation (or --yes flag)
+    $Confirmed = Confirm-Action "Delete this profile?" "No"
+
+    if (-not $Confirmed) {
+        Write-Host "[i] Cancelled"
+        return 0
     }
 
     # Delete instance directory
-    $InstancePath = "$InstancesDir\$(Get-SanitizedProfileName $ProfileName)"
     if (Test-Path $InstancePath) {
         Remove-Item $InstancePath -Recurse -Force
     }
@@ -962,6 +1232,65 @@ function Invoke-AuthCommands {
     }
 }
 
+function Install-ShellCompletion {
+    param([string[]]$Args)
+
+    Write-Host ""
+    Write-Host "Shell Completion Installer" -ForegroundColor Yellow
+    Write-Host ""
+
+    # Ensure completion directory exists
+    $CompletionsDir = Join-Path $env:USERPROFILE ".ccs\completions"
+    if (-not (Test-Path $CompletionsDir)) {
+        New-Item -ItemType Directory -Path $CompletionsDir -Force | Out-Null
+    }
+
+    # Ensure completion file exists
+    $CompletionFile = Join-Path $CompletionsDir "ccs.ps1"
+    if (-not (Test-Path $CompletionFile)) {
+        Write-Host "[X] Completion file not found. Please reinstall CCS." -ForegroundColor Red
+        Write-Host ""
+        exit 1
+    }
+
+    # Get PowerShell profile path
+    $ProfilePath = $PROFILE
+    $ProfileDir = Split-Path $ProfilePath -Parent
+
+    # Create profile directory if it doesn't exist
+    if (-not (Test-Path $ProfileDir)) {
+        New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null
+    }
+
+    # Comment marker for easy identification
+    $Marker = "# CCS shell completion"
+    $SourceCmd = ". `"$CompletionFile`""
+
+    # Check if already installed
+    if (Test-Path $ProfilePath) {
+        $Content = Get-Content $ProfilePath -Raw -ErrorAction SilentlyContinue
+        if ($Content -and $Content.Contains($Marker)) {
+            Write-Host "[OK] Shell completion already installed" -ForegroundColor Green
+            Write-Host ""
+            return 0
+        }
+    }
+
+    # Append to PowerShell profile
+    $Block = "`n$Marker`n$SourceCmd`n"
+    Add-Content -Path $ProfilePath -Value $Block -NoNewline
+
+    Write-Host "[OK] Shell completion installed successfully!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Added to $ProfilePath"
+    Write-Host ""
+    Write-Host "To activate:" -ForegroundColor Cyan
+    Write-Host "  . `$PROFILE"
+    Write-Host ""
+
+    return 0
+}
+
 # --- Main Execution Logic ---
 
 # Special case: version command (check BEFORE profile detection)
@@ -986,6 +1315,13 @@ if ($Help) {
         Show-Help
         exit 0
     }
+}
+
+# Special case: shell completion installer
+if ($RemainingArgs.Count -gt 0 -and $RemainingArgs[0] -eq "--shell-completion") {
+    $CompletionArgs = if ($RemainingArgs.Count -gt 1) { $RemainingArgs[1..($RemainingArgs.Count-1)] } else { @() }
+    $Result = Install-ShellCompletion $CompletionArgs
+    exit $Result
 }
 
 # Special case: auth commands
@@ -1025,11 +1361,36 @@ if ($Profile -notmatch '^[a-zA-Z0-9_-]+$') {
 $ProfileInfo = Get-ProfileType $Profile
 
 if ($ProfileInfo.Type -eq "error") {
-    $ErrorMessage = "Profile '$Profile' not found" + "`n`n" +
-    "Available profiles:" + "`n" +
-    (Get-AvailableProfiles)
+    # Get suggestions using fuzzy matching
+    $AllProfiles = Get-AllProfileNames
+    $Suggestions = Find-SimilarStrings -Target $Profile -Candidates $AllProfiles
 
-    Write-ErrorMsg $ErrorMessage
+    Write-Host ""
+    Write-Host "[X] Profile '$Profile' not found" -ForegroundColor Red
+    Write-Host ""
+
+    # Show suggestions if any
+    if ($Suggestions -and $Suggestions.Count -gt 0) {
+        Write-Host "Did you mean:" -ForegroundColor Yellow
+        foreach ($suggestion in $Suggestions) {
+            Write-Host "  $suggestion"
+        }
+        Write-Host ""
+    }
+
+    Write-Host "Available profiles:" -ForegroundColor Cyan
+    Get-AvailableProfiles | ForEach-Object { Write-Host $_ }
+    Write-Host ""
+    Write-Host "Solutions:" -ForegroundColor Yellow
+    Write-Host "  # Use existing profile"
+    Write-Host "  ccs <profile> `"your prompt`""
+    Write-Host ""
+    Write-Host "  # Create new account profile"
+    Write-Host "  ccs auth create <name>"
+    Write-Host ""
+    Write-Host "Error: $script:E_PROFILE_NOT_FOUND" -ForegroundColor Yellow
+    Write-Host (Get-ErrorDocUrl $script:E_PROFILE_NOT_FOUND) -ForegroundColor Yellow
+    Write-Host ""
     exit 1
 }
 
