@@ -2,27 +2,28 @@
 
 ## Overview
 
-CCS (Claude Code Switch) v4.5.0 is a lightweight CLI wrapper enabling instant profile switching between Claude Sonnet 4.5, GLM 4.6, GLMT (GLM with Thinking), and Kimi for Coding models. Version 4.x introduces AI-powered delegation, selective .claude/ directory symlinking, stream-JSON output, and enhanced shell completion. **Phase 02 (2025-11-27)** completes modular command architecture refactoring with 44.6% main file reduction. v4.5.0 completes transition to Node.js-first architecture with bootstrap-based installers.
+CCS (Claude Code Switch) v4.5.0 is a lightweight CLI wrapper enabling instant profile switching between Claude Sonnet 4.5, GLM 4.6, GLMT (GLM with Thinking), and Kimi for Coding models. Version 4.x introduces AI-powered delegation, selective .claude/ directory symlinking, stream-JSON output, and enhanced shell completion. **Phase 02 (2025-11-28)** completes modular command architecture refactoring with 44.6% main file reduction and deprecates native shell installers. v4.5.0 completes transition to npm-first, Node.js-based architecture with bootstrap installers and CSS text-only output (no emojis).
 
 ## Version Evolution
 
-### v4.5.0 Architecture (Current, Phase 02 Complete)
+### v4.5.0 Architecture (Current, Phase 02 Complete - 2025-11-28)
 - **Total LOC**: ~8,477 lines (JavaScript/TypeScript)
 - **Main File**: src/ccs.ts - 593 lines (**44.6% reduction** from 1,071 lines)
 - **Key Features**: AI delegation, stream-JSON output, shell completion, doctor diagnostics, sync command
-- **Phase 02 Modular Commands**: 6 specialized command handlers (version, help, install, doctor, sync, shell-completion)
+- **Phase 02 Modular Commands**: 6 specialized command handlers (version, help, install, doctor, sync, shell-completion) + deprecation notices
+- **Installation Method**: npm-first (curl/irm scripts deprecated, auto-redirect to npm)
 - **New Components**: src/commands/, src/utils/shell-executor.ts, src/utils/package-manager-detector.ts
 - **Architecture**: Modular design with clear separation: auth/, delegation/, glmt/, management/, utils/, commands/, types/
-- **Installation**: Bootstrap-based native installers (requires Node.js 14+, no shell dependencies)
+- **Output Format**: Text-only ASCII indicators ([OK], [!], [X], [i]) - no emoji usage per CLAUDE.md
 
 ### Evolution Summary
 - **v2.x**: Vault-based credential encryption (~1,700 LOC)
 - **v3.0**: Vault removal, login-per-profile (~1,100 LOC, 40% reduction)
 - **v4.0-4.4.x**: Delegation system, .claude/ sharing, stream-JSON (~8,477 LOC including tests/utils)
-- **Phase 02 (2025-11-27)**: Modular command architecture, main file 44.6% reduction
-- **v4.5.0**: Bootstrap-based installers, TypeScript npm package with quality gates + modular commands
+- **Phase 02 (2025-11-28)**: Modular command architecture, native installer deprecation, main file 44.6% reduction
+- **v4.5.0**: npm-first distribution, TypeScript package with quality gates, modular commands, text-only output (no emojis)
 
-## Core Components (Phase 02 Complete - 2025-11-27)
+## Core Components (Phase 02 Complete - 2025-11-28)
 
 ### 1. Main Entry Point (`src/ccs.ts` - 593 lines, 44.6% reduction)
 
@@ -235,7 +236,7 @@ ccs work "task"
 3. Postinstall: ClaudeSymlinkManager creates selective symlinks → `~/.claude/`
 4. User can now use `/ccs` (auto-select) and `/ccs:continue` commands
 
-## File Structure (Phase 02 Complete - 2025-11-27)
+## File Structure (Phase 02 Complete - 2025-11-28)
 
 ```
 src/                         # TypeScript source files (Phase 02 Modular Architecture)
@@ -423,9 +424,16 @@ ccs.js: execClaude(["command"], {CLAUDE_CONFIG_DIR: instancePath})
 Claude CLI: Read credentials from instance, execute
 ```
 
-## Key Features (v4.3.2)
+## Key Features (v4.5.0 - Phase 02 Complete)
 
-### 1. AI-Powered Delegation (v4.0)
+### 1. npm-First Installation (Phase 02 - 2025-11-28)
+- **Recommended method**: All users directed to npm installation
+- **Native installer deprecation**: curl/irm scripts auto-redirect to npm
+- **Cross-platform parity**: Single installation method across macOS/Linux/Windows
+- **Easy updates**: `npm install -g @kaitranntt/ccs` (version pinning supported)
+- **Bootstrap installers**: Replaced shell scripts with Node.js-based installation
+
+### 2. AI-Powered Delegation (v4.0+)
 - **Headless execution**: `ccs glm -p "task"` runs without interactive UI
 - **Stream-JSON output**: Real-time tool visibility (`[Tool] Write: file.js`)
 - **Session continuation**: `ccs glm:continue -p "follow-up"` resumes last session
@@ -433,25 +441,31 @@ Claude CLI: Read credentials from instance, execute
 - **Signal handling**: Proper Ctrl+C cleanup
 - **13 tools supported**: Comprehensive Claude Code tool coverage
 
-### 2. Selective .claude/ Symlinking (v4.1)
+### 3. Selective .claude/ Symlinking (v4.1)
 - **Package-provided**: `.claude/` ships with npm, copied to `~/.ccs/.claude/`
 - **Selective symlinks**: Only CCS items linked to `~/.claude/`
 - **Non-invasive**: Doesn't overwrite user's commands/skills
 - **Windows support**: Falls back to copying if symlinks unavailable
 - **Auto-sync**: `ccs sync` re-creates symlinks
 
-### 3. Enhanced Shell Completion (v4.1.4)
+### 4. Enhanced Shell Completion (v4.1.4)
 - **4 shells**: bash, zsh, fish, PowerShell
 - **Color-coded**: Commands vs descriptions
 - **Categorized**: Model profiles, account profiles, flags
 - **Auto-install**: `ccs --shell-completion` or `ccs -sc`
 
-### 4. Comprehensive Diagnostics (v4.1+)
+### 5. Comprehensive Diagnostics (v4.1+)
 - **ccs doctor**: Health check for installation, configs, symlinks, delegation
 - **ccs sync**: Re-sync delegation commands and skills
 - **ccs update**: Check for updates (v4.1+)
 
-### 5. GLMT Thinking Mode (v3.x, stable experimental)
+### 6. Text-Only Output (Phase 02 - CLAUDE.md Compliance)
+- **ASCII indicators only**: [OK], [!], [X], [i] (no emoji)
+- **TTY-aware colors**: Respects NO_COLOR environment variable
+- **Consistent formatting**: Box borders for errors using ╔═╗║╚╝
+- **Cross-platform consistency**: Identical output on all shells
+
+### 7. GLMT Thinking Mode (v3.x, stable experimental)
 - **Embedded proxy**: HTTP proxy on localhost:random
 - **Format conversion**: Anthropic ↔ OpenAI
 - **Reasoning injection**: Force English, thinking prompts
@@ -538,30 +552,37 @@ Claude CLI: Read credentials from instance, execute
 
 ## Summary
 
-**CCS Phase 02 Achievements (2025-11-27)**:
+**CCS Phase 02 Achievements (2025-11-28)**:
+- **npm-First Distribution**: Deprecated native shell installers, all users directed to npm
 - **Modular Command Architecture**: 6 specialized command handlers with single responsibility principle
 - **44.6% Main File Reduction**: src/ccs.ts reduced from 1,071 to 593 lines
+- **Text-Only Output**: All emoji removed ([!] replaces ⚠️), CLAUDE.md compliance
 - **Enhanced Maintainability**: Focused modules for version, help, install, doctor, sync, shell-completion
 - **New Utility Modules**: Cross-platform shell execution and package manager detection
 - **TypeScript Excellence**: 100% type coverage across all new modules
+- **Installation Flow**: Auto-redirection from deprecated shell scripts to npm
 
-**CCS v4.3.2 Achievements**:
+**CCS v4.5.0 Overall Achievements**:
 - **Delegation system**: Complete AI-powered task routing with stream-JSON
 - **Selective symlinking**: Non-invasive .claude/ directory sharing
 - **Shell completion**: Enhanced UX with color-coded completions
 - **Diagnostics**: Comprehensive health checking and auto-recovery
+- **npm Package**: Bootstrap-based installation, quality gates (typecheck, lint, format, test)
 - **Modular architecture**: Clear separation of concerns (auth/, delegation/, glmt/, management/, utils/, commands/, types/)
 
-**Design Principles Maintained**:
+**Design Principles (STRICT ENFORCEMENT)**:
 - **YAGNI**: Only essential features implemented
 - **KISS**: Simple, readable code without over-engineering
 - **DRY**: Single source of truth for each concern
+- **CLI-First**: All features must have CLI interface
+- **No Emojis**: ASCII indicators only per CLAUDE.md
 
 **Code Quality**:
 - **Total LOC**: ~8,477 lines (src/ TypeScript)
 - **Main File**: 593 lines (44.6% reduction from 1,071 lines)
 - **Test Coverage**: >90% for critical paths
-- **Modularity**: 8 subsystems (main, auth, delegation, glmt, management, utils, commands, types, .claude/)
-- **Documentation**: Comprehensive inline comments and external docs
+- **Modularity**: 9 subsystems (main, auth, delegation, glmt, management, utils, commands, types, .claude/)
+- **Documentation**: Comprehensive inline comments, README.md, 8+ doc files
+- **Output Format**: ASCII-only text, TTY-aware colors, NO_COLOR compliant
 
-v4.3.2 demonstrates successful feature expansion (delegation, symlinking, diagnostics) while maintaining core simplicity and zero breaking changes from v3.0. Phase 02 modular command architecture further enhances maintainability and provides a sustainable foundation for future AI-powered development workflow enhancements.
+Phase 02 (2025-11-28) completes npm-first transition with native installer deprecation and text-only output compliance. v4.5.0 demonstrates successful feature expansion (delegation, symlinking, diagnostics, modular CLI) while maintaining core simplicity and zero breaking changes from v3.0. Bootstrap-based installers eliminate shell script complexity and provide consistent cross-platform behavior.

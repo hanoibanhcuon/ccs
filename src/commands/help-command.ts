@@ -102,9 +102,10 @@ export function handleHelpCommand(): void {
   console.log('');
 
   console.log(colored('Uninstall:', 'yellow'));
-  console.log('  npm:          npm uninstall -g @kaitranntt/ccs');
-  console.log('  macOS/Linux:  curl -fsSL ccs.kaitran.ca/uninstall | bash');
-  console.log('  Windows:      irm ccs.kaitran.ca/uninstall | iex');
+  console.log('  npm (recommended):  npm uninstall -g @kaitranntt/ccs');
+  console.log('  Legacy (deprecated):');
+  console.log('    macOS/Linux:  curl -fsSL ccs.kaitran.ca/uninstall | bash');
+  console.log('    Windows:      irm ccs.kaitran.ca/uninstall | iex');
   console.log('');
 
   console.log(colored('Documentation:', 'cyan'));
