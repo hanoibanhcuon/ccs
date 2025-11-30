@@ -1,194 +1,123 @@
-#!/usr/bin/env node
-'use strict';
-
+const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { SettingsParser } = require('../../../dist/delegation/settings-parser');
 
-/**
- * Test runner
- */
-class TestRunner {
-  constructor() {
-    this.tests = [];
-    this.passed = 0;
-    this.failed = 0;
-  }
+describe('SettingsParser', () => {
+  const testDir = path.join(os.tmpdir(), 'ccs-test-settings');
+  const claudeDir = path.join(testDir, '.claude');
 
-  test(name, fn) {
-    this.tests.push({ name, fn });
-  }
-
-  async run() {
-    console.log('\n=== Settings Parser Tests ===\n');
-
-    for (const { name, fn } of this.tests) {
-      try {
-        await fn();
-        console.log(`[OK] ${name}`);
-        this.passed++;
-      } catch (error) {
-        console.error(`[X] ${name}`);
-        console.error(`  Error: ${error.message}`);
-        this.failed++;
-      }
+  function setupTestDir() {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true });
     }
-
-    console.log(`\nResults: ${this.passed} passed, ${this.failed} failed`);
-    process.exit(this.failed > 0 ? 1 : 0);
+    fs.mkdirSync(claudeDir, { recursive: true });
   }
-}
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message || 'Assertion failed');
-}
-
-function assertEqual(actual, expected, message) {
-  if (actual !== expected) {
-    throw new Error(message || `Expected ${expected}, got ${actual}`);
+  function cleanupTestDir() {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true });
+    }
   }
-}
 
-// Test suite
-const runner = new TestRunner();
+  beforeEach(() => {
+    setupTestDir();
+  });
 
-// Test fixture directory
-const testDir = path.join(os.tmpdir(), 'ccs-test-settings');
-const claudeDir = path.join(testDir, '.claude');
+  after(() => {
+    cleanupTestDir();
+  });
 
-// Cleanup helpers
-function setupTestDir() {
-  if (fs.existsSync(testDir)) {
-    fs.rmSync(testDir, { recursive: true });
-  }
-  fs.mkdirSync(claudeDir, { recursive: true });
-}
+  describe('No settings files', () => {
+    it('returns empty arrays when no settings files', () => {
+      const restrictions = SettingsParser.parseToolRestrictions(testDir);
 
-function cleanupTestDir() {
-  if (fs.existsSync(testDir)) {
-    fs.rmSync(testDir, { recursive: true });
-  }
-}
+      assert.strictEqual(restrictions.allowedTools.length, 0);
+      assert.strictEqual(restrictions.disallowedTools.length, 0);
+    });
+  });
 
-/**
- * Test 1: No settings files
- */
-runner.test('Return empty arrays when no settings files', () => {
-  setupTestDir();
+  describe('Parse shared settings', () => {
+    it('parses shared settings.json', () => {
+      const settingsPath = path.join(claudeDir, 'settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify({
+        permissions: {
+          allow: ['Bash(git:*)', 'Read'],
+          deny: ['Bash(rm:*)']
+        }
+      }));
 
-  const restrictions = SettingsParser.parseToolRestrictions(testDir);
+      const restrictions = SettingsParser.parseToolRestrictions(testDir);
 
-  assertEqual(restrictions.allowedTools.length, 0, 'Should have 0 allowed tools');
-  assertEqual(restrictions.disallowedTools.length, 0, 'Should have 0 disallowed tools');
-});
+      assert.strictEqual(restrictions.allowedTools.length, 2);
+      assert.strictEqual(restrictions.disallowedTools.length, 1);
+      assert.ok(restrictions.allowedTools.includes('Bash(git:*)'));
+      assert.ok(restrictions.disallowedTools.includes('Bash(rm:*)'));
+    });
+  });
 
-/**
- * Test 2: Parse shared settings.json
- */
-runner.test('Parse shared settings.json', () => {
-  setupTestDir();
+  describe('Local settings override', () => {
+    it('local settings override shared', () => {
+      fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify({
+        permissions: {
+          allow: ['Read'],
+          deny: []
+        }
+      }));
 
-  const settingsPath = path.join(claudeDir, 'settings.json');
-  fs.writeFileSync(settingsPath, JSON.stringify({
-    permissions: {
-      allow: ['Bash(git:*)', 'Read'],
-      deny: ['Bash(rm:*)']
-    }
-  }));
+      fs.writeFileSync(path.join(claudeDir, 'settings.local.json'), JSON.stringify({
+        permissions: {
+          allow: ['Bash(git:*)'],
+          deny: ['Bash(rm:*)']
+        }
+      }));
 
-  const restrictions = SettingsParser.parseToolRestrictions(testDir);
+      const restrictions = SettingsParser.parseToolRestrictions(testDir);
 
-  assertEqual(restrictions.allowedTools.length, 2, 'Should have 2 allowed tools');
-  assertEqual(restrictions.disallowedTools.length, 1, 'Should have 1 disallowed tool');
-  assert(restrictions.allowedTools.includes('Bash(git:*)'), 'Should include git bash');
-  assert(restrictions.disallowedTools.includes('Bash(rm:*)'), 'Should include rm deny');
-});
+      assert.strictEqual(restrictions.allowedTools.length, 2);
+      assert.ok(restrictions.allowedTools.includes('Read'));
+      assert.ok(restrictions.allowedTools.includes('Bash(git:*)'));
+      assert.strictEqual(restrictions.disallowedTools.length, 1);
+    });
+  });
 
-/**
- * Test 3: Parse local settings overriding shared
- */
-runner.test('Local settings override shared', () => {
-  setupTestDir();
+  describe('Error handling', () => {
+    it('handles malformed JSON gracefully', () => {
+      const settingsPath = path.join(claudeDir, 'settings.json');
+      fs.writeFileSync(settingsPath, '{ invalid json }');
 
-  // Shared settings
-  fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify({
-    permissions: {
-      allow: ['Read'],
-      deny: []
-    }
-  }));
+      const restrictions = SettingsParser.parseToolRestrictions(testDir);
 
-  // Local settings (adds more permissions)
-  fs.writeFileSync(path.join(claudeDir, 'settings.local.json'), JSON.stringify({
-    permissions: {
-      allow: ['Bash(git:*)'],
-      deny: ['Bash(rm:*)']
-    }
-  }));
+      assert.strictEqual(restrictions.allowedTools.length, 0);
+      assert.strictEqual(restrictions.disallowedTools.length, 0);
+    });
 
-  const restrictions = SettingsParser.parseToolRestrictions(testDir);
+    it('handles settings without permissions key', () => {
+      const settingsPath = path.join(claudeDir, 'settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify({
+        someOtherKey: 'value'
+      }));
 
-  assertEqual(restrictions.allowedTools.length, 2, 'Should merge allowed tools');
-  assert(restrictions.allowedTools.includes('Read'), 'Should have shared Read');
-  assert(restrictions.allowedTools.includes('Bash(git:*)'), 'Should have local git');
-  assertEqual(restrictions.disallowedTools.length, 1, 'Should have local deny');
-});
+      const restrictions = SettingsParser.parseToolRestrictions(testDir);
 
-/**
- * Test 4: Handle malformed JSON
- */
-runner.test('Handle malformed JSON gracefully', () => {
-  setupTestDir();
+      assert.strictEqual(restrictions.allowedTools.length, 0);
+      assert.strictEqual(restrictions.disallowedTools.length, 0);
+    });
 
-  const settingsPath = path.join(claudeDir, 'settings.json');
-  fs.writeFileSync(settingsPath, '{ invalid json }');
+    it('handles empty permissions arrays', () => {
+      const settingsPath = path.join(claudeDir, 'settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify({
+        permissions: {
+          allow: [],
+          deny: []
+        }
+      }));
 
-  // Should not throw
-  const restrictions = SettingsParser.parseToolRestrictions(testDir);
+      const restrictions = SettingsParser.parseToolRestrictions(testDir);
 
-  assertEqual(restrictions.allowedTools.length, 0, 'Should return empty arrays on parse error');
-  assertEqual(restrictions.disallowedTools.length, 0);
-});
-
-/**
- * Test 5: Handle missing permissions key
- */
-runner.test('Handle settings without permissions key', () => {
-  setupTestDir();
-
-  const settingsPath = path.join(claudeDir, 'settings.json');
-  fs.writeFileSync(settingsPath, JSON.stringify({
-    someOtherKey: 'value'
-  }));
-
-  const restrictions = SettingsParser.parseToolRestrictions(testDir);
-
-  assertEqual(restrictions.allowedTools.length, 0, 'Should handle missing permissions');
-  assertEqual(restrictions.disallowedTools.length, 0);
-});
-
-/**
- * Test 6: Handle empty permissions arrays
- */
-runner.test('Handle empty permissions arrays', () => {
-  setupTestDir();
-
-  const settingsPath = path.join(claudeDir, 'settings.json');
-  fs.writeFileSync(settingsPath, JSON.stringify({
-    permissions: {
-      allow: [],
-      deny: []
-    }
-  }));
-
-  const restrictions = SettingsParser.parseToolRestrictions(testDir);
-
-  assertEqual(restrictions.allowedTools.length, 0);
-  assertEqual(restrictions.disallowedTools.length, 0);
-});
-
-// Run tests and cleanup
-runner.run().finally(() => {
-  cleanupTestDir();
+      assert.strictEqual(restrictions.allowedTools.length, 0);
+      assert.strictEqual(restrictions.disallowedTools.length, 0);
+    });
+  });
 });

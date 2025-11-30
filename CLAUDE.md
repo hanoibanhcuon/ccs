@@ -13,47 +13,43 @@ CLI wrapper for instant switching between multiple Claude accounts and alternati
 - **DRY**: One source of truth (config.json)
 - **CLI-First**: All features must have CLI interface
 
-## TypeScript Quality Gates (CORE PURPOSE)
+## TypeScript Quality Gates
 
 **The npm package is 100% TypeScript. Quality gates MUST pass before publish.**
 
-**Package Manager: bun (preferred)** - 10-25x faster than npm
+**Package Manager: bun** - 10-25x faster than npm
 ```bash
 bun install          # Install dependencies (creates bun.lockb)
 bun run build        # Compile src/ → dist/
-bun run validate     # Full validation: typecheck + lint + format + test
+bun run validate     # Full validation: typecheck + lint:fix + format:check + test
 ```
 
-**Quality gate scripts:**
+**Fix issues before committing:**
 ```bash
-bun run typecheck    # Type-check without emit (tsc --noEmit)
-bun run lint         # ESLint TypeScript rules
 bun run lint:fix     # Auto-fix lint issues
-bun run format       # Prettier formatting (write)
-bun run format:check # Prettier check (CI)
-bun run test         # Build + run all tests
+bun run format       # Auto-fix formatting
 ```
 
 **Automatic enforcement:**
-- `prepublishOnly` runs `validate` before `npm publish`
-- `prepack` runs `validate` before `npm pack`
-- CI/CD should run `bun run validate` on every PR
+- `prepublishOnly` / `prepack` runs `validate` + `sync-version.js`
+- CI/CD runs `bun run validate` on every PR
 
 **File structure:**
-- `src/` - TypeScript source (development)
-- `dist/` - Compiled JavaScript (production, npm package)
+- `src/` - TypeScript source (55 modules)
+- `dist/` - Compiled JavaScript (npm package)
 - `lib/` - Native shell scripts (bash, PowerShell)
 
-**Linting rules (eslint.config.mjs):**
-- `no-unused-vars` - warn (upgrade to error incrementally)
-- `no-explicit-any` - warn (upgrade to error incrementally)
-- `no-non-null-assertion` - warn
+**Linting rules (eslint.config.mjs) - ALL errors:**
+- `@typescript-eslint/no-unused-vars` - error (ignore `_` prefix)
+- `@typescript-eslint/no-explicit-any` - error
+- `@typescript-eslint/no-non-null-assertion` - error
 - `prefer-const`, `no-var`, `eqeqeq` - error
 
-**Type safety rules:**
+**Type safety (tsconfig.json):**
+- `strict: true` with all strict flags enabled
+- `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns` - enabled
 - Avoid `any` types - use proper typing or `unknown`
 - Avoid `@ts-ignore` - fix the type error properly
-- Strict mode enabled in tsconfig.json
 
 ## Critical Constraints (NEVER VIOLATE)
 
@@ -66,12 +62,26 @@ bun run test         # Build + run all tests
 
 ## Key Technical Details
 
-### Profile Mechanisms
+### Profile Mechanisms (Priority Order)
 
-**CLIProxy**: gemini, codex, agy → OAuth-based, zero config
-**CLIProxy Variants**: user-defined profiles in `config.cliproxy` section → custom settings for CLIProxy providers
-**Settings-based**: `--settings` flag → GLM, GLMT, Kimi, default
-**Account-based**: `CLAUDE_CONFIG_DIR` → isolated Claude Sub instances
+1. **CLIProxy hardcoded**: gemini, codex, agy → OAuth-based, zero config
+2. **CLIProxy variants**: `config.cliproxy` section → user-defined providers
+3. **Settings-based**: `config.profiles` section → GLM, GLMT, Kimi
+4. **Account-based**: `profiles.json` → isolated instances via `CLAUDE_CONFIG_DIR`
+
+### Settings Format (CRITICAL)
+
+All env values MUST be strings (not booleans/objects) to prevent PowerShell crashes.
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.example.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "your-api-key",
+    "ANTHROPIC_MODEL": "model-name"
+  }
+}
+```
 
 ### Shared Data Architecture
 
@@ -81,19 +91,22 @@ Windows fallback: Copies if symlinks unavailable
 
 ## Code Standards (REQUIRED)
 
-### Bash (lib/ccs)
-- bash 3.2+, `set -euo pipefail`, quote all vars `"$VAR"`, `[[ ]]` tests only
-- `jq` only external dependency
+### Architecture
+- `lib/ccs`, `lib/ccs.ps1` - Bootstrap scripts (delegate to Node.js via npx)
+- `src/*.ts` → `dist/*.js` - Main implementation (TypeScript)
 
-### PowerShell (lib/ccs.ps1)
+### Bash (lib/*.sh)
+- bash 3.2+, `set -euo pipefail`, quote all vars `"$VAR"`, `[[ ]]` tests
+- NO external dependencies
+
+### PowerShell (lib/*.ps1)
 - PowerShell 5.1+, `$ErrorActionPreference = "Stop"`
 - Native JSON only, no external dependencies
 
-### TypeScript/Node.js (src/*.ts → dist/*.js)
+### TypeScript (src/*.ts)
 - Node.js 14+, Bun 1.0+, TypeScript 5.3, strict mode
 - `child_process.spawn`, handle SIGINT/SIGTERM
-- Run `bun run lint && bun run typecheck` before committing
-- Format with `bun run format` if needed
+- Run `bun run validate` before committing
 
 ### Terminal Output (ENFORCE)
 - ASCII only: [OK], [!], [X], [i] (NO emojis)
@@ -102,80 +115,46 @@ Windows fallback: Copies if symlinks unavailable
 
 ## Development Workflows
 
-### Version Management
-```bash
-./scripts/bump-version.sh [major|minor|patch]  # Updates VERSION, install scripts
-```
-
 ### Testing (REQUIRED before PR)
 ```bash
-./tests/edge-cases.sh      # Unix
-./tests/edge-cases.ps1     # Windows
+bun run test              # All tests
+bun run test:npm          # npm package tests
+bun run test:native       # Native install tests
+bun run test:unit         # Unit tests
+```
+
+### Version Management
+```bash
+./scripts/bump-version.sh [major|minor|patch]  # Updates VERSION, sync-version.js
 ```
 
 ### Local Development
 ```bash
-./installers/install.sh && ./ccs --version     # Test install
-rm -rf ~/.ccs                                  # Clean environment
+./scripts/dev-install.sh       # Build, pack, install globally
+rm -rf ~/.ccs                  # Clean environment
 ```
 
 ## Development Tasks (FOLLOW STRICTLY)
 
 ### New Feature Checklist
 1. Verify YAGNI/KISS/DRY alignment - reject if doesn't align
-2. Implement in bash + PowerShell + Node.js (all three)
+2. Implement in TypeScript (`src/*.ts`)
 3. **REQUIRED**: Update `--help` in src/ccs.ts, lib/ccs, lib/ccs.ps1
-4. Test on macOS/Linux/Windows
-5. Add test cases to tests/edge-cases.*
+4. Add unit tests (`tests/unit/**/*.test.js`)
+5. Run `bun run validate`
 6. Update README.md if user-facing
 
 ### Bug Fix Checklist
 1. Add regression test first
-2. Fix in bash + PowerShell + Node.js (all three)
-3. Verify no regressions
-4. Test all platforms
+2. Fix in TypeScript (or native scripts if bootstrap-related)
+3. Run `bun run validate`
 
 ## Pre-PR Checklist (MANDATORY)
 
-Platform testing:
-- [ ] macOS (bash), Linux (bash), Windows (PowerShell + Git Bash)
-- [ ] Edge cases pass (./tests/edge-cases.*)
-
-Code standards:
-- [ ] ASCII only (NO emojis)
-- [ ] TTY colors disabled when piped
-- [ ] NO_COLOR respected
-- [ ] `--help` updated in src/ccs.ts, lib/ccs, lib/ccs.ps1
-- [ ] `--help` consistent across all three
-- [ ] `bun run validate` passes (typecheck + lint + format + tests)
-
-Install/behavior:
-- [ ] Idempotent install
-- [ ] Concurrent sessions work
-- [ ] Instance isolation maintained
-
-## Implementation Details
-
-### Profile Resolution Logic
-1. Check `profiles.json` (account-based) → `CLAUDE_CONFIG_DIR`
-2. Check `config.json` (settings-based) → `--settings`
-3. Not found → error + list available profiles
-
-### Settings Format (CRITICAL)
-All env values MUST be strings (not booleans/objects) to prevent PowerShell crashes.
-
-```json
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "key",
-    "ANTHROPIC_MODEL": "glm-4.6",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-4.6",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.6",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.6"
-  }
-}
-```
+- [ ] `bun run validate` passes (typecheck + lint:fix + format:check + tests)
+- [ ] `--help` updated and consistent across src/ccs.ts, lib/ccs, lib/ccs.ps1
+- [ ] ASCII only (NO emojis), NO_COLOR respected
+- [ ] Idempotent install, concurrent sessions work, instance isolation maintained
 
 ## Error Handling Principles
 

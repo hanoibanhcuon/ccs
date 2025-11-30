@@ -14,15 +14,18 @@
   - `helpers.sh` - Bash test utilities and functions
   - `test-data.js` - Test data for npm tests
   - `fixtures/` - Test configuration files
-  - `unit/` - Unit tests for helper functions (7 tests)
+  - `unit/` - Unit tests for helper functions
+- `unit/` - Module unit tests (GLMT, delegation)
 
 ## Running Tests
 
-- **All tests**: `npm test` (83 tests total)
-- **npm package only**: `npm run test:npm` (39 tests)
-- **Native installation only**: `npm run test:native` (37 tests)
-- **Unit tests only**: `npm run test:unit` (7 tests)
-- **Master orchestrator**: `npm run test:edge-cases` (backward compatible)
+```bash
+bun run test              # All tests (177 total)
+bun run test:unit         # Unit tests only (138)
+bun run test:npm          # npm package tests (39)
+bun run test:native       # Native installation tests (37)
+bun run test:edge-cases   # Master orchestrator (backward compatible)
+```
 
 ## Test Structure
 
@@ -58,7 +61,9 @@ Common test code, data, and helper functions shared across test suites to avoid 
 - `shared/helpers.sh` - Bash test utilities and functions
 - `shared/test-data.js` - Test data for npm tests
 - `shared/fixtures/` - Test configuration files
-- `shared/unit/` - 7 unit tests for helper functions
+- `shared/unit/` - Unit tests for helper functions
+- `unit/glmt/` - GLMT transformer unit tests
+- `unit/delegation/` - Delegation module unit tests
 
 ## Test Counts
 
@@ -66,8 +71,8 @@ Common test code, data, and helper functions shared across test suites to avoid 
 |-----------|-------|----------|
 | Native Unix | 37 | `native/unix/` |
 | npm Package | 39 | `npm/` |
-| Unit Tests | 7 | `shared/unit/` |
-| **Total** | **83** | **All suites** |
+| Unit Tests | 138 | `shared/unit/`, `unit/glmt/`, `unit/delegation/` |
+| **Total** | **177** | **All suites** |
 
 ## Backward Compatibility
 
@@ -83,4 +88,4 @@ This restructure solves the original problem where Section 10 (npm postinstall t
 - ✅ Targeted execution: `npm run test:npm` vs `npm run test:native`
 - ✅ Better organization: Obvious where to add new tests
 - ✅ DRY principle: Shared utilities in `shared/`
-- ✅ Increased coverage: From 41 to 83 tests
+- ✅ Increased coverage: From 41 to 177 tests

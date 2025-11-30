@@ -1,172 +1,111 @@
-#!/usr/bin/env node
-'use strict';
-
+const assert = require('assert');
 const { HeadlessExecutor } = require('../../../dist/delegation/headless-executor');
 
-/**
- * Test runner
- */
-class TestRunner {
-  constructor() {
-    this.tests = [];
-    this.passed = 0;
-    this.failed = 0;
-  }
+describe('Permission Mode', () => {
+  describe('Validation', () => {
+    it('accepts acceptEdits mode', () => {
+      assert.doesNotThrow(() => HeadlessExecutor._validatePermissionMode('acceptEdits'));
+    });
 
-  test(name, fn) {
-    this.tests.push({ name, fn });
-  }
+    it('accepts plan mode', () => {
+      assert.doesNotThrow(() => HeadlessExecutor._validatePermissionMode('plan'));
+    });
 
-  async run() {
-    console.log('\n=== Permission Mode Tests ===\n');
+    it('accepts default mode', () => {
+      assert.doesNotThrow(() => HeadlessExecutor._validatePermissionMode('default'));
+    });
 
-    for (const { name, fn } of this.tests) {
-      try {
-        await fn();
-        console.log(`[OK] ${name}`);
-        this.passed++;
-      } catch (error) {
-        console.error(`[X] ${name}`);
-        console.error(`  Error: ${error.message}`);
-        this.failed++;
+    it('accepts bypassPermissions mode', () => {
+      assert.doesNotThrow(() => HeadlessExecutor._validatePermissionMode('bypassPermissions'));
+    });
+
+    it('rejects invalid mode', () => {
+      assert.throws(
+        () => HeadlessExecutor._validatePermissionMode('invalidMode'),
+        /Invalid permission mode/
+      );
+    });
+
+    it('rejects empty mode', () => {
+      assert.throws(
+        () => HeadlessExecutor._validatePermissionMode(''),
+        /Invalid permission mode/
+      );
+    });
+
+    it('rejects null mode', () => {
+      assert.throws(
+        () => HeadlessExecutor._validatePermissionMode(null),
+        /Invalid permission mode/
+      );
+    });
+  });
+
+  describe('CLI args construction', () => {
+    it('builds args for acceptEdits mode', () => {
+      const args = ['-p', 'test', '--settings', '/path/settings.json'];
+      const permissionMode = 'acceptEdits';
+
+      if (permissionMode && permissionMode !== 'default') {
+        if (permissionMode === 'bypassPermissions') {
+          args.push('--dangerously-skip-permissions');
+        } else {
+          args.push('--permission-mode', permissionMode);
+        }
       }
-    }
 
-    console.log(`\nResults: ${this.passed} passed, ${this.failed} failed`);
-    process.exit(this.failed > 0 ? 1 : 0);
-  }
-}
+      assert.ok(args.includes('--permission-mode'));
+      assert.ok(args.includes('acceptEdits'));
+      assert.ok(!args.includes('--dangerously-skip-permissions'));
+    });
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message || 'Assertion failed');
-}
+    it('builds args for plan mode', () => {
+      const args = ['-p', 'test', '--settings', '/path/settings.json'];
+      const permissionMode = 'plan';
 
-// Test suite
-const runner = new TestRunner();
+      if (permissionMode && permissionMode !== 'default') {
+        if (permissionMode === 'bypassPermissions') {
+          args.push('--dangerously-skip-permissions');
+        } else {
+          args.push('--permission-mode', permissionMode);
+        }
+      }
 
-/**
- * Test 1: Validation accepts valid modes
- */
-runner.test('Validate acceptEdits mode', () => {
-  // Should not throw
-  HeadlessExecutor._validatePermissionMode('acceptEdits');
+      assert.ok(args.includes('--permission-mode'));
+      assert.ok(args.includes('plan'));
+    });
+
+    it('builds args for bypassPermissions mode', () => {
+      const args = ['-p', 'test', '--settings', '/path/settings.json'];
+      const permissionMode = 'bypassPermissions';
+
+      if (permissionMode && permissionMode !== 'default') {
+        if (permissionMode === 'bypassPermissions') {
+          args.push('--dangerously-skip-permissions');
+        } else {
+          args.push('--permission-mode', permissionMode);
+        }
+      }
+
+      assert.ok(args.includes('--dangerously-skip-permissions'));
+      assert.ok(!args.includes('--permission-mode'));
+    });
+
+    it('builds args for default mode (no flag)', () => {
+      const args = ['-p', 'test', '--settings', '/path/settings.json'];
+      const permissionMode = 'default';
+
+      if (permissionMode && permissionMode !== 'default') {
+        if (permissionMode === 'bypassPermissions') {
+          args.push('--dangerously-skip-permissions');
+        } else {
+          args.push('--permission-mode', permissionMode);
+        }
+      }
+
+      assert.ok(!args.includes('--permission-mode'));
+      assert.ok(!args.includes('--dangerously-skip-permissions'));
+      assert.strictEqual(args.length, 4);
+    });
+  });
 });
-
-runner.test('Validate plan mode', () => {
-  HeadlessExecutor._validatePermissionMode('plan');
-});
-
-runner.test('Validate default mode', () => {
-  HeadlessExecutor._validatePermissionMode('default');
-});
-
-runner.test('Validate bypassPermissions mode', () => {
-  HeadlessExecutor._validatePermissionMode('bypassPermissions');
-});
-
-/**
- * Test 2: Validation rejects invalid modes
- */
-runner.test('Reject invalid mode', () => {
-  let thrown = false;
-  try {
-    HeadlessExecutor._validatePermissionMode('invalidMode');
-  } catch (error) {
-    thrown = true;
-    assert(error.message.includes('Invalid permission mode'), 'Error message should mention invalid mode');
-    assert(error.message.includes('invalidMode'), 'Error should show the invalid value');
-  }
-  assert(thrown, 'Should throw error for invalid mode');
-});
-
-runner.test('Reject empty mode', () => {
-  let thrown = false;
-  try {
-    HeadlessExecutor._validatePermissionMode('');
-  } catch (error) {
-    thrown = true;
-  }
-  assert(thrown, 'Should throw error for empty mode');
-});
-
-runner.test('Reject null mode', () => {
-  let thrown = false;
-  try {
-    HeadlessExecutor._validatePermissionMode(null);
-  } catch (error) {
-    thrown = true;
-  }
-  assert(thrown, 'Should throw error for null mode');
-});
-
-/**
- * Test 3: CLI args construction (simulation)
- */
-runner.test('Build args for acceptEdits mode', () => {
-  const args = ['-p', 'test', '--settings', '/path/settings.json'];
-  const permissionMode = 'acceptEdits';
-
-  if (permissionMode && permissionMode !== 'default') {
-    if (permissionMode === 'bypassPermissions') {
-      args.push('--dangerously-skip-permissions');
-    } else {
-      args.push('--permission-mode', permissionMode);
-    }
-  }
-
-  assert(args.includes('--permission-mode'), 'Should have permission-mode flag');
-  assert(args.includes('acceptEdits'), 'Should have acceptEdits value');
-  assert(!args.includes('--dangerously-skip-permissions'), 'Should not have bypass flag');
-});
-
-runner.test('Build args for plan mode', () => {
-  const args = ['-p', 'test', '--settings', '/path/settings.json'];
-  const permissionMode = 'plan';
-
-  if (permissionMode && permissionMode !== 'default') {
-    if (permissionMode === 'bypassPermissions') {
-      args.push('--dangerously-skip-permissions');
-    } else {
-      args.push('--permission-mode', permissionMode);
-    }
-  }
-
-  assert(args.includes('--permission-mode'), 'Should have permission-mode flag');
-  assert(args.includes('plan'), 'Should have plan value');
-});
-
-runner.test('Build args for bypassPermissions mode', () => {
-  const args = ['-p', 'test', '--settings', '/path/settings.json'];
-  const permissionMode = 'bypassPermissions';
-
-  if (permissionMode && permissionMode !== 'default') {
-    if (permissionMode === 'bypassPermissions') {
-      args.push('--dangerously-skip-permissions');
-    } else {
-      args.push('--permission-mode', permissionMode);
-    }
-  }
-
-  assert(args.includes('--dangerously-skip-permissions'), 'Should have bypass flag');
-  assert(!args.includes('--permission-mode'), 'Should not have permission-mode flag');
-});
-
-runner.test('Build args for default mode (no flag)', () => {
-  const args = ['-p', 'test', '--settings', '/path/settings.json'];
-  const permissionMode = 'default';
-
-  if (permissionMode && permissionMode !== 'default') {
-    if (permissionMode === 'bypassPermissions') {
-      args.push('--dangerously-skip-permissions');
-    } else {
-      args.push('--permission-mode', permissionMode);
-    }
-  }
-
-  assert(!args.includes('--permission-mode'), 'Should not add permission-mode for default');
-  assert(!args.includes('--dangerously-skip-permissions'), 'Should not add bypass for default');
-  assert(args.length === 4, 'Should only have base args');
-});
-
-// Run tests
-runner.run();

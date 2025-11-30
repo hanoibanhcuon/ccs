@@ -1,293 +1,174 @@
-#!/usr/bin/env node
-'use strict';
-
-/**
- * ReasoningEnforcer Unit Tests
- *
- * Test scenarios:
- * 1. Opt-in behavior (enabled vs disabled)
- * 2. System message injection
- * 3. User message fallback
- * 4. Effort level selection (low/medium/high/max)
- * 5. Message structure handling (string vs array)
- * 6. Edge cases (empty messages, no system/user)
- */
-
+const assert = require('assert');
 const ReasoningEnforcer = require('../../../dist/glmt/reasoning-enforcer').default;
 
-/**
- * Simple test runner (no external dependencies)
- */
-class TestRunner {
-  constructor() {
-    this.tests = [];
-    this.passed = 0;
-    this.failed = 0;
-  }
+describe('ReasoningEnforcer', () => {
+  describe('Opt-in behavior', () => {
+    it('should NOT inject when disabled and thinking=false', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: false });
+      const messages = [{ role: 'user', content: 'What is 2+2?' }];
 
-  test(name, fn) {
-    this.tests.push({ name, fn });
-  }
+      const result = enforcer.injectInstruction(messages, { thinking: false });
 
-  async run() {
-    console.log('\n=== ReasoningEnforcer Tests ===\n');
+      assert.strictEqual(result.length, 1);
+      assert.strictEqual(result[0].content, 'What is 2+2?');
+    });
 
-    for (const { name, fn } of this.tests) {
-      try {
-        await fn();
-        console.log(`[OK] ${name}`);
-        this.passed++;
-      } catch (error) {
-        console.error(`[X] ${name}`);
-        console.error(`  Error: ${error.message}`);
-        this.failed++;
-      }
-    }
+    it('should inject when enabled=true', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'What is 2+2?' }];
 
-    console.log(`\n=== Results ===`);
-    console.log(`Passed: ${this.passed}/${this.tests.length}`);
-    console.log(`Failed: ${this.failed}/${this.tests.length}`);
+      const result = enforcer.injectInstruction(messages, { thinking: false });
 
-    return this.failed === 0;
-  }
-}
+      assert.ok(result[0].content.includes('CRITICAL'));
+      assert.ok(result[0].content.includes('<reasoning_content>'));
+    });
 
-/**
- * Simple assertion helpers
- */
-function assertEqual(actual, expected, message) {
-  if (actual !== expected) {
-    throw new Error(
-      `${message || 'Assertion failed'}\n` +
-      `  Expected: ${JSON.stringify(expected)}\n` +
-      `  Actual: ${JSON.stringify(actual)}`
-    );
-  }
-}
+    it('should inject when thinking=true (even if enabled=false)', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: false });
+      const messages = [{ role: 'user', content: 'What is 2+2?' }];
 
-function assertTrue(condition, message) {
-  if (!condition) {
-    throw new Error(message || 'Expected condition to be true');
-  }
-}
+      const result = enforcer.injectInstruction(messages, { thinking: true });
 
-function assertIncludes(haystack, needle, message) {
-  if (!haystack.includes(needle)) {
-    throw new Error(
-      `${message || 'String does not include expected substring'}\n` +
-      `  Expected substring: ${needle}\n` +
-      `  Actual string: ${haystack.substring(0, 100)}...`
-    );
-  }
-}
+      assert.ok(result[0].content.includes('CRITICAL'));
+    });
+  });
 
-function assertDeepEqual(actual, expected, message) {
-  const actualStr = JSON.stringify(actual);
-  const expectedStr = JSON.stringify(expected);
-  if (actualStr !== expectedStr) {
-    throw new Error(
-      `${message || 'Deep equality assertion failed'}\n` +
-      `  Expected: ${expectedStr}\n` +
-      `  Actual: ${actualStr}`
-    );
-  }
-}
+  describe('System message injection', () => {
+    it('should prepend to system message (string content)', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'Calculate 2+2' }
+      ];
 
-// Create test runner
-const runner = new TestRunner();
+      const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'medium' });
 
-// Test 1: Opt-in behavior - disabled
-runner.test('should NOT inject when disabled and thinking=false', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: false });
-  const messages = [
-    { role: 'user', content: 'What is 2+2?' }
-  ];
+      assert.strictEqual(result.length, 2);
+      assert.ok(result[0].content.startsWith('You are an expert reasoning model'));
+      assert.ok(result[0].content.includes('You are a helpful assistant'));
+      assert.strictEqual(result[1].content, 'Calculate 2+2');
+    });
 
-  const result = enforcer.injectInstruction(messages, { thinking: false });
+    it('should prepend to system message (array content)', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [
+        {
+          role: 'system',
+          content: [{ type: 'text', text: 'You are a code assistant.' }]
+        },
+        { role: 'user', content: 'Write a function' }
+      ];
 
-  assertEqual(result.length, 1);
-  assertEqual(result[0].content, 'What is 2+2?');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true });
 
-// Test 2: Opt-in behavior - enabled
-runner.test('should inject when enabled=true', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [
-    { role: 'user', content: 'What is 2+2?' }
-  ];
+      assert.ok(Array.isArray(result[0].content));
+      assert.strictEqual(result[0].content[0].type, 'text');
+      assert.ok(result[0].content[0].text.includes('CRITICAL'));
+      assert.strictEqual(result[0].content[1].text, 'You are a code assistant.');
+    });
+  });
 
-  const result = enforcer.injectInstruction(messages, { thinking: false });
+  describe('User message fallback', () => {
+    it('should prepend to first user message when no system message', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'Explain quantum computing' }];
 
-  assertIncludes(result[0].content, 'CRITICAL');
-  assertIncludes(result[0].content, '<reasoning_content>');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true });
 
-// Test 3: Opt-in behavior - thinking=true
-runner.test('should inject when thinking=true (even if enabled=false)', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: false });
-  const messages = [
-    { role: 'user', content: 'What is 2+2?' }
-  ];
+      assert.strictEqual(result.length, 1);
+      assert.ok(result[0].content.includes('CRITICAL'));
+      assert.ok(result[0].content.includes('Explain quantum computing'));
+    });
+  });
 
-  const result = enforcer.injectInstruction(messages, { thinking: true });
+  describe('Effort levels', () => {
+    it('should use low prompt template', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'Test' }];
 
-  assertIncludes(result[0].content, 'CRITICAL');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'low' });
 
-// Test 4: System message injection - string content
-runner.test('should prepend to system message (string content)', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [
-    { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user', content: 'Calculate 2+2' }
-  ];
+      assert.ok(result[0].content.toLowerCase().includes('brief analysis'));
+    });
 
-  const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'medium' });
+    it('should use medium prompt template', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'Test' }];
 
-  assertEqual(result.length, 2);
-  assertTrue(result[0].content.startsWith('You are an expert reasoning model'));
-  assertIncludes(result[0].content, 'You are a helpful assistant');
-  assertEqual(result[1].content, 'Calculate 2+2');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'medium' });
 
-// Test 5: System message injection - array content
-runner.test('should prepend to system message (array content)', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [
-    {
-      role: 'system',
-      content: [
-        { type: 'text', text: 'You are a code assistant.' }
-      ]
-    },
-    { role: 'user', content: 'Write a function' }
-  ];
+      assert.ok(result[0].content.toLowerCase().includes('think step-by-step'));
+    });
 
-  const result = enforcer.injectInstruction(messages, { thinking: true });
+    it('should use high prompt template', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'Test' }];
 
-  assertTrue(Array.isArray(result[0].content));
-  assertEqual(result[0].content[0].type, 'text');
-  assertIncludes(result[0].content[0].text, 'CRITICAL');
-  assertEqual(result[0].content[1].text, 'You are a code assistant.');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'high' });
 
-// Test 6: User message fallback
-runner.test('should prepend to first user message when no system message', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [
-    { role: 'user', content: 'Explain quantum computing' }
-  ];
+      assert.ok(result[0].content.toLowerCase().includes('think deeply and systematically'));
+    });
 
-  const result = enforcer.injectInstruction(messages, { thinking: true });
+    it('should use max prompt template', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'Test' }];
 
-  assertEqual(result.length, 1);
-  assertIncludes(result[0].content, 'CRITICAL');
-  assertIncludes(result[0].content, 'Explain quantum computing');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'max' });
 
-// Test 7: Effort level - low
-runner.test('should use low prompt template', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [{ role: 'user', content: 'Test' }];
+      assert.ok(result[0].content.toLowerCase().includes('exhaustively from first principles'));
+    });
 
-  const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'low' });
+    it('should default to medium effort if not specified', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'user', content: 'Test' }];
 
-  assertIncludes(result[0].content.toLowerCase(), 'brief analysis');
-});
+      const result = enforcer.injectInstruction(messages, { thinking: true });
 
-// Test 8: Effort level - medium
-runner.test('should use medium prompt template', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [{ role: 'user', content: 'Test' }];
+      assert.ok(result[0].content.includes('think step-by-step'));
+    });
+  });
 
-  const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'medium' });
+  describe('Edge cases', () => {
+    it('should handle empty messages array', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const result = enforcer.injectInstruction([], { thinking: true });
 
-  assertIncludes(result[0].content.toLowerCase(), 'think step-by-step');
-});
+      assert.strictEqual(result.length, 0);
+    });
 
-// Test 9: Effort level - high
-runner.test('should use high prompt template', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [{ role: 'user', content: 'Test' }];
+    it('should handle messages with no system or user role', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const messages = [{ role: 'assistant', content: 'Previous response' }];
 
-  const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'high' });
+      const result = enforcer.injectInstruction(messages, { thinking: true });
 
-  assertIncludes(result[0].content.toLowerCase(), 'think deeply and systematically');
-});
+      assert.strictEqual(result.length, 1);
+      assert.strictEqual(result[0].content, 'Previous response');
+    });
 
-// Test 10: Effort level - max
-runner.test('should use max prompt template', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [{ role: 'user', content: 'Test' }];
+    it('should not mutate original messages array', () => {
+      const enforcer = new ReasoningEnforcer({ enabled: true });
+      const originalMessages = [{ role: 'user', content: 'Test prompt' }];
+      const originalCopy = JSON.parse(JSON.stringify(originalMessages));
 
-  const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'max' });
+      enforcer.injectInstruction(originalMessages, { thinking: true });
 
-  assertIncludes(result[0].content.toLowerCase(), 'exhaustively from first principles');
-});
+      assert.deepStrictEqual(originalMessages, originalCopy);
+    });
 
-// Test 11: Default effort level
-runner.test('should default to medium effort if not specified', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [{ role: 'user', content: 'Test' }];
+    it('should handle custom prompts via constructor', () => {
+      const customPrompts = {
+        low: 'Custom low prompt',
+        medium: 'Custom medium prompt',
+        high: 'Custom high prompt',
+        max: 'Custom max prompt'
+      };
+      const enforcer = new ReasoningEnforcer({ enabled: true, prompts: customPrompts });
+      const messages = [{ role: 'user', content: 'Test' }];
 
-  const result = enforcer.injectInstruction(messages, { thinking: true });
+      const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'low' });
 
-  assertIncludes(result[0].content, 'think step-by-step');
-});
-
-// Test 12: Empty messages array
-runner.test('should handle empty messages array', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [];
-
-  const result = enforcer.injectInstruction(messages, { thinking: true });
-
-  assertEqual(result.length, 0);
-});
-
-// Test 13: No system or user role
-runner.test('should handle messages with no system or user role', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const messages = [
-    { role: 'assistant', content: 'Previous response' }
-  ];
-
-  const result = enforcer.injectInstruction(messages, { thinking: true });
-
-  assertEqual(result.length, 1);
-  assertEqual(result[0].content, 'Previous response');
-});
-
-// Test 14: Immutability
-runner.test('should not mutate original messages array', () => {
-  const enforcer = new ReasoningEnforcer({ enabled: true });
-  const originalMessages = [
-    { role: 'user', content: 'Test prompt' }
-  ];
-  const originalCopy = JSON.parse(JSON.stringify(originalMessages));
-
-  enforcer.injectInstruction(originalMessages, { thinking: true });
-
-  assertDeepEqual(originalMessages, originalCopy);
-});
-
-// Test 15: Custom prompts
-runner.test('should handle custom prompts via constructor', () => {
-  const customPrompts = {
-    low: 'Custom low prompt',
-    medium: 'Custom medium prompt',
-    high: 'Custom high prompt',
-    max: 'Custom max prompt'
-  };
-  const enforcer = new ReasoningEnforcer({ enabled: true, prompts: customPrompts });
-  const messages = [{ role: 'user', content: 'Test' }];
-
-  const result = enforcer.injectInstruction(messages, { thinking: true, effort: 'low' });
-
-  assertIncludes(result[0].content, 'Custom low prompt');
-});
-
-// Run all tests
-runner.run().then(success => {
-  process.exit(success ? 0 : 1);
+      assert.ok(result[0].content.includes('Custom low prompt'));
+    });
+  });
 });

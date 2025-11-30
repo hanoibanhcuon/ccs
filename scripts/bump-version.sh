@@ -68,12 +68,17 @@ echo ""
 echo "Note: lib/ccs and lib/ccs.ps1 are now bootstraps"
 echo "      (delegate to Node.js, no version hardcoded)"
 echo ""
-read -p "Continue? (y/N) " -n 1 -r
-echo
 
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled."
-    exit 0
+# Auto-confirm in non-interactive mode (CI, piped, etc.)
+if [[ ! -t 0 ]]; then
+    echo "[i] Non-interactive mode detected, proceeding..."
+else
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
 fi
 
 # Update VERSION file

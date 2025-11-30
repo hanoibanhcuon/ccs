@@ -11,7 +11,7 @@
  */
 
 const assert = require('assert');
-const LocaleEnforcer = require('../../../dist/glmt/locale-enforcer').default;
+const { LocaleEnforcer } = require('../../../dist/glmt/locale-enforcer');
 
 describe('LocaleEnforcer', () => {
   describe('Scenario 1: English prompt → English output', () => {

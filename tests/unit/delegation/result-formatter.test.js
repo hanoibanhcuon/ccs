@@ -1,368 +1,305 @@
-#!/usr/bin/env node
-'use strict';
-
+const assert = require('assert');
 const { ResultFormatter } = require('../../../dist/delegation/result-formatter');
 
-/**
- * Simple test runner (no external dependencies)
- */
-class TestRunner {
-  constructor() {
-    this.tests = [];
-    this.passed = 0;
-    this.failed = 0;
-  }
+describe('ResultFormatter', () => {
+  describe('Basic formatting', () => {
+    it('formats successful result', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/home/user/project',
+        exitCode: 0,
+        stdout: 'Task completed successfully',
+        stderr: '',
+        duration: 2300,
+        success: true
+      };
 
-  test(name, fn) {
-    this.tests.push({ name, fn });
-  }
+      const formatted = ResultFormatter.format(result);
 
-  async run() {
-    console.log('\n=== ResultFormatter Tests ===\n');
+      assert.ok(formatted.includes('Delegated to GLM-4.6'));
+      assert.ok(formatted.includes('ccs:glm'));
+      assert.ok(formatted.includes('/home/user/project'));
+      assert.ok(formatted.includes('2.3s'));
+      assert.ok(formatted.includes('Exit Code: 0'));
+      assert.ok(formatted.includes('[OK]'));
+    });
 
-    for (const { name, fn } of this.tests) {
-      try {
-        await fn();
-        console.log(`[OK] ${name}`);
-        this.passed++;
-      } catch (error) {
-        console.error(`[X] ${name}`);
-        console.error(`  Error: ${error.message}`);
-        this.failed++;
-      }
-    }
+    it('formats failed result', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/home/user/project',
+        exitCode: 1,
+        stdout: 'Error occurred',
+        stderr: 'Command failed',
+        duration: 1500,
+        success: false
+      };
 
-    console.log(`\nResults: ${this.passed} passed, ${this.failed} failed`);
-    process.exit(this.failed > 0 ? 1 : 0);
-  }
-}
+      const formatted = ResultFormatter.format(result);
 
-/**
- * Assertion helpers
- */
-function assert(condition, message) {
-  if (!condition) throw new Error(message || 'Assertion failed');
-}
+      assert.ok(formatted.includes('[X]'));
+      assert.ok(formatted.includes('Exit Code: 1'));
+      assert.ok(formatted.includes('Delegation failed'));
+      assert.ok(formatted.includes('Stderr:'));
+      assert.ok(formatted.includes('Command failed'));
+    });
 
-function assertIncludes(haystack, needle, message) {
-  if (!haystack.includes(needle)) {
-    throw new Error(message || `Expected to include "${needle}"`);
-  }
-}
+    it('handles empty output', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        duration: 1000,
+        success: true
+      };
 
-/**
- * Run tests
- */
-const runner = new TestRunner();
+      const formatted = ResultFormatter.format(result);
 
-// Test 1: Basic formatting
-runner.test('Should format successful result', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/home/user/project',
-    exitCode: 0,
-    stdout: 'Task completed successfully',
-    stderr: '',
-    duration: 2300,
-    success: true
-  };
+      assert.ok(formatted.includes('No output'));
+    });
+  });
 
-  const formatted = ResultFormatter.format(result);
+  describe('File changes extraction', () => {
+    it('extracts created files from output', () => {
+      const output = 'Created: src/auth.js\nCreated: tests/auth.test.js';
 
-  assertIncludes(formatted, 'Delegated to GLM-4.6', 'Should mention model');
-  assertIncludes(formatted, 'ccs:glm', 'Should mention profile');
-  assertIncludes(formatted, '/home/user/project', 'Should include CWD');
-  assertIncludes(formatted, '2.3s', 'Should format duration');
-  assertIncludes(formatted, 'Exit Code: 0', 'Should show exit code');
-  assertIncludes(formatted, '[OK]', 'Should show success');
+      const { created } = ResultFormatter.extractFileChanges(output);
+
+      assert.strictEqual(created.length, 2);
+      assert.ok(created[0].includes('src/auth.js'));
+      assert.ok(created[1].includes('tests/auth.test.js'));
+    });
+
+    it('extracts modified files from output', () => {
+      const output = 'Modified: src/index.js\nUpdated: package.json';
+
+      const { modified } = ResultFormatter.extractFileChanges(output);
+
+      assert.strictEqual(modified.length, 2);
+      assert.ok(modified[0].includes('src/index.js'));
+      assert.ok(modified[1].includes('package.json'));
+    });
+
+    it('extracts both created and modified files', () => {
+      const output = 'Created: src/new.js\nModified: src/old.js\nCreated: tests/new.test.js';
+
+      const { created, modified } = ResultFormatter.extractFileChanges(output);
+
+      assert.strictEqual(created.length, 2);
+      assert.strictEqual(modified.length, 1);
+    });
+
+    it('deduplicates files in lists', () => {
+      const output = 'Created: src/file.js\nCreated: src/file.js\nModified: src/file.js';
+
+      const { created, modified } = ResultFormatter.extractFileChanges(output);
+
+      assert.strictEqual(created.length, 1);
+      assert.strictEqual(modified.length, 0);
+    });
+
+    it('matches file patterns case-insensitively', () => {
+      const output = 'CREATED: src/file.js\nMODIFIED: src/other.js';
+
+      const { created, modified } = ResultFormatter.extractFileChanges(output);
+
+      assert.strictEqual(created.length, 1);
+      assert.strictEqual(modified.length, 1);
+    });
+  });
+
+  describe('Output passthrough', () => {
+    it('passes through stdout content', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/home/user/project',
+        exitCode: 0,
+        stdout: 'Created: src/new.js\nModified: src/old.js',
+        stderr: '',
+        duration: 1000,
+        success: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('src/new.js'));
+      assert.ok(formatted.includes('src/old.js'));
+    });
+
+    it('preserves multi-line output', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: 'Line 1\nLine 2\nLine 3',
+        stderr: '',
+        duration: 1000,
+        success: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('Line 1'));
+      assert.ok(formatted.includes('Line 2'));
+      assert.ok(formatted.includes('Line 3'));
+    });
+  });
+
+  describe('ASCII box formatting', () => {
+    it('uses ASCII box characters', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: 'Done',
+        stderr: '',
+        duration: 1000,
+        success: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('╔'));
+      assert.ok(formatted.includes('╗'));
+      assert.ok(formatted.includes('╚'));
+      assert.ok(formatted.includes('╝'));
+      assert.ok(formatted.includes('║'));
+      assert.ok(formatted.includes('═'));
+    });
+  });
+
+  describe('Model display names', () => {
+    it('shows correct model display names', () => {
+      const glmResult = {
+        profile: 'glm',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        duration: 1000,
+        success: true
+      };
+
+      const glmFormatted = ResultFormatter.format(glmResult);
+      assert.ok(glmFormatted.includes('GLM-4.6'));
+
+      const kimiResult = { ...glmResult, profile: 'kimi' };
+      const kimiFormatted = ResultFormatter.format(kimiResult);
+      assert.ok(kimiFormatted.includes('Kimi'));
+    });
+  });
+
+  describe('Duration formatting', () => {
+    it('formats duration correctly', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        duration: 12345,
+        success: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('12.3s'));
+    });
+  });
+
+  describe('Minimal format', () => {
+    it('supports minimal format', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: 'Done',
+        stderr: '',
+        duration: 1500,
+        success: true
+      };
+
+      const minimal = ResultFormatter.formatMinimal(result);
+
+      assert.ok(minimal.includes('[OK]'));
+      assert.ok(minimal.includes('GLM-4.6'));
+      assert.ok(minimal.includes('1.5s'));
+      assert.ok(minimal.split('\n').length <= 3);
+    });
+  });
+
+  describe('Cost handling', () => {
+    it('handles undefined totalCost in timeout error', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        duration: 120000,
+        sessionId: 'test-session-123',
+        totalCost: undefined,
+        numTurns: 5,
+        timedOut: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('Execution timed out'));
+      assert.ok(formatted.includes('test-ses'));
+      assert.ok(!formatted.includes('Cost: $'));
+    });
+
+    it('handles null totalCost in timeout error', () => {
+      const result = {
+        profile: 'kimi',
+        cwd: '/test',
+        duration: 60000,
+        sessionId: 'test-session-456',
+        totalCost: null,
+        numTurns: 3,
+        timedOut: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('Execution timed out'));
+      assert.ok(!formatted.includes('Cost: $'));
+    });
+
+    it('shows totalCost when defined in timeout error', () => {
+      const result = {
+        profile: 'glm',
+        cwd: '/test',
+        duration: 90000,
+        sessionId: 'test-session-789',
+        totalCost: 0.1234,
+        numTurns: 4,
+        timedOut: true
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('Cost: $0.1234'));
+    });
+
+    it('handles undefined totalCost in normal result', () => {
+      const result = {
+        profile: 'kimi',
+        cwd: '/test',
+        exitCode: 0,
+        stdout: 'Task completed',
+        stderr: '',
+        duration: 5000,
+        success: true,
+        sessionId: 'session-abc',
+        totalCost: undefined,
+        numTurns: 2
+      };
+
+      const formatted = ResultFormatter.format(result);
+
+      assert.ok(formatted.includes('[OK]'));
+      assert.ok(!formatted.includes('Cost: $'));
+    });
+  });
 });
-
-// Test 2: Failed result
-runner.test('Should format failed result', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/home/user/project',
-    exitCode: 1,
-    stdout: 'Error occurred',
-    stderr: 'Command failed',
-    duration: 1500,
-    success: false
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, '[X]', 'Should show failure indicator');
-  assertIncludes(formatted, 'Exit Code: 1', 'Should show non-zero exit code');
-  assertIncludes(formatted, 'Delegation failed', 'Should indicate failure');
-  assertIncludes(formatted, 'Stderr:', 'Should include stderr section');
-  assertIncludes(formatted, 'Command failed', 'Should show stderr content');
-});
-
-// Test 3: Extract created files
-runner.test('Should extract created files from output', () => {
-  const output = 'Created: src/auth.js\nCreated: tests/auth.test.js';
-
-  const { created, modified } = ResultFormatter.extractFileChanges(output);
-
-  assert(created.length === 2, 'Should find 2 created files');
-  assertIncludes(created[0], 'src/auth.js', 'Should include first file');
-  assertIncludes(created[1], 'tests/auth.test.js', 'Should include second file');
-});
-
-// Test 4: Extract modified files
-runner.test('Should extract modified files from output', () => {
-  const output = 'Modified: src/index.js\nUpdated: package.json';
-
-  const { created, modified } = ResultFormatter.extractFileChanges(output);
-
-  assert(modified.length === 2, 'Should find 2 modified files');
-  assertIncludes(modified[0], 'src/index.js', 'Should include first file');
-  assertIncludes(modified[1], 'package.json', 'Should include second file');
-});
-
-// Test 5: Extract mixed file changes
-runner.test('Should extract both created and modified files', () => {
-  const output = 'Created: src/new.js\nModified: src/old.js\nCreated: tests/new.test.js';
-
-  const { created, modified } = ResultFormatter.extractFileChanges(output);
-
-  assert(created.length === 2, 'Should find 2 created files');
-  assert(modified.length === 1, 'Should find 1 modified file');
-});
-
-// Test 6: No duplicate files in lists
-runner.test('Should not duplicate files in created/modified lists', () => {
-  const output = 'Created: src/file.js\nCreated: src/file.js\nModified: src/file.js';
-
-  const { created, modified } = ResultFormatter.extractFileChanges(output);
-
-  assert(created.length === 1, 'Should deduplicate created files');
-  assert(modified.length === 0, 'Should not list created files as modified');
-});
-
-// Test 7: Format file lists
-runner.test('Should format file lists in output', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/home/user/project',
-    exitCode: 0,
-    stdout: 'Created: src/new.js\nModified: src/old.js',
-    stderr: '',
-    duration: 1000,
-    success: true
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, '[i] Created Files:', 'Should have created header');
-  assertIncludes(formatted, 'src/new.js', 'Should list created file');
-  assertIncludes(formatted, '[i] Modified Files:', 'Should have modified header');
-  assertIncludes(formatted, 'src/old.js', 'Should list modified file');
-});
-
-// Test 8: ASCII box formatting
-runner.test('Should use ASCII box characters', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/home/user/project',
-    exitCode: 0,
-    stdout: 'Done',
-    stderr: '',
-    duration: 1000,
-    success: true
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, '╔', 'Should have top-left corner');
-  assertIncludes(formatted, '╗', 'Should have top-right corner');
-  assertIncludes(formatted, '╚', 'Should have bottom-left corner');
-  assertIncludes(formatted, '╝', 'Should have bottom-right corner');
-  assertIncludes(formatted, '║', 'Should have vertical borders');
-  assertIncludes(formatted, '═', 'Should have horizontal borders');
-});
-
-// Test 9: Model display names
-runner.test('Should use correct model display names', () => {
-  const glmResult = {
-    profile: 'glm',
-    cwd: '/test',
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
-    duration: 1000,
-    success: true
-  };
-
-  const glmFormatted = ResultFormatter.format(glmResult);
-  assertIncludes(glmFormatted, 'GLM-4.6', 'Should show GLM-4.6');
-
-  const kimiResult = { ...glmResult, profile: 'kimi' };
-  const kimiFormatted = ResultFormatter.format(kimiResult);
-  assertIncludes(kimiFormatted, 'Kimi', 'Should show Kimi');
-});
-
-// Test 10: Duration formatting
-runner.test('Should format duration correctly', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/test',
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
-    duration: 12345,
-    success: true
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, '12.3s', 'Should format to 1 decimal place');
-});
-
-// Test 11: Empty output handling
-runner.test('Should handle empty output', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/test',
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
-    duration: 1000,
-    success: true
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, 'No output', 'Should indicate no output');
-});
-
-// Test 12: Minimal format
-runner.test('Should support minimal format', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/test',
-    exitCode: 0,
-    stdout: 'Done',
-    stderr: '',
-    duration: 1500,
-    success: true
-  };
-
-  const minimal = ResultFormatter.formatMinimal(result);
-
-  assertIncludes(minimal, '[OK]', 'Should show success');
-  assertIncludes(minimal, 'GLM-4.6', 'Should show model');
-  assertIncludes(minimal, '1.5s', 'Should show duration');
-  assert(minimal.split('\n').length <= 3, 'Should be concise');
-});
-
-// Test 13: Case-insensitive file pattern matching
-runner.test('Should match file patterns case-insensitively', () => {
-  const output = 'CREATED: src/file.js\nMODIFIED: src/other.js';
-
-  const { created, modified } = ResultFormatter.extractFileChanges(output);
-
-  assert(created.length === 1, 'Should find created file (uppercase)');
-  assert(modified.length === 1, 'Should find modified file (uppercase)');
-});
-
-// Test 14: File count in info box
-runner.test('Should show file counts in info box', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/test',
-    exitCode: 0,
-    stdout: 'Created: a.js\nCreated: b.js\nModified: c.js',
-    stderr: '',
-    duration: 1000,
-    success: true
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, 'Files Created: 2', 'Should show created count');
-  assertIncludes(formatted, 'Files Modified: 1', 'Should show modified count');
-});
-
-// Test 15: Handle undefined totalCost in timeout error
-runner.test('Should handle undefined totalCost in timeout error', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/test',
-    duration: 120000,
-    sessionId: 'test-session-123',
-    totalCost: undefined,
-    numTurns: 5,
-    timedOut: true
-  };
-
-  // Should not throw TypeError
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, 'Execution timed out', 'Should show timeout message');
-  assertIncludes(formatted, 'test-ses', 'Should show abbreviated session ID');
-  // Cost line should be omitted when undefined
-  assert(!formatted.includes('Cost: $'), 'Should not show cost when undefined');
-});
-
-// Test 16: Handle null totalCost in timeout error
-runner.test('Should handle null totalCost in timeout error', () => {
-  const result = {
-    profile: 'kimi',
-    cwd: '/test',
-    duration: 60000,
-    sessionId: 'test-session-456',
-    totalCost: null,
-    numTurns: 3,
-    timedOut: true
-  };
-
-  // Should not throw TypeError
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, 'Execution timed out', 'Should show timeout message');
-  assert(!formatted.includes('Cost: $'), 'Should not show cost when null');
-});
-
-// Test 17: Show totalCost when defined in timeout error
-runner.test('Should show totalCost when defined in timeout error', () => {
-  const result = {
-    profile: 'glm',
-    cwd: '/test',
-    duration: 90000,
-    sessionId: 'test-session-789',
-    totalCost: 0.1234,
-    numTurns: 4,
-    timedOut: true
-  };
-
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, 'Cost: $0.1234', 'Should show formatted cost');
-});
-
-// Test 18: Handle undefined totalCost in normal result
-runner.test('Should handle undefined totalCost in normal result', () => {
-  const result = {
-    profile: 'kimi',
-    cwd: '/test',
-    exitCode: 0,
-    stdout: 'Task completed',
-    stderr: '',
-    duration: 5000,
-    success: true,
-    sessionId: 'session-abc',
-    totalCost: undefined,
-    numTurns: 2
-  };
-
-  // Should not throw TypeError
-  const formatted = ResultFormatter.format(result);
-
-  assertIncludes(formatted, '[OK]', 'Should show success');
-  // Cost line should be omitted in info box when undefined
-  assert(!formatted.includes('Cost: $'), 'Should not show cost when undefined');
-});
-
-// Run all tests
-runner.run();
