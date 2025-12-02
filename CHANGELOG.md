@@ -1,3 +1,10 @@
+# [5.4.0-beta.2](https://github.com/kaitranntt/ccs/compare/v5.4.0-beta.1...v5.4.0-beta.2) (2025-12-02)
+
+
+### Bug Fixes
+
+* **auth:** prevent default profile from using stale glm env vars ([13d13da](https://github.com/kaitranntt/ccs/commit/13d13dab516332bc17345dc77afd44ae48bdd2aa)), closes [#37](https://github.com/kaitranntt/ccs/issues/37)
+
 # [5.4.0-beta.1](https://github.com/kaitranntt/ccs/compare/v5.3.0...v5.4.0-beta.1) (2025-12-02)
 
 
