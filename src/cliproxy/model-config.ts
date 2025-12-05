@@ -172,6 +172,11 @@ export async function configureProviderModel(
     ...ccsControlledEnv,
   };
 
+  // Remove MAX_THINKING_TOKENS when switching away from Claude model
+  if (!isClaude && mergedEnv.MAX_THINKING_TOKENS) {
+    delete mergedEnv.MAX_THINKING_TOKENS;
+  }
+
   // Build final settings: preserve user top-level settings + update env
   const settings: Record<string, unknown> = {
     ...existingSettings,
