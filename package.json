@@ -69,6 +69,7 @@
     "test:unit": "bun test tests/unit/",
     "test:npm": "bun test tests/npm/",
     "test:native": "bash tests/native/unix/edge-cases.sh",
+    "dev": "bun run ui:build && bun run build:server && bun dist/ccs.js config",
     "ui:dev": "cd ui && bun run dev",
     "ui:build": "cd ui && bun run build",
     "ui:preview": "cd ui && bun run preview",
