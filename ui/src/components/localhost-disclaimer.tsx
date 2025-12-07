@@ -25,7 +25,7 @@ export function LocalhostDisclaimer() {
         right: '0',
       }}
     >
-      <div className="flex items-center justify-between max-w-7xl">
+      <div className="flex items-center justify-center gap-4">
         <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
           <Shield className="w-4 h-4 flex-shrink-0" />
           <span className="hidden sm:inline">
