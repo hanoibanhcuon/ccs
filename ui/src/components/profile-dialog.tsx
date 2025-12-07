@@ -6,12 +6,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -90,22 +85,13 @@ export function ProfileDialog({ open, onClose, profile }: ProfileDialogProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              {...register('name')}
-              placeholder="my-api"
-              disabled={!!profile}
-            />
+            <Input id="name" {...register('name')} placeholder="my-api" disabled={!!profile} />
             {errors.name && <span className="text-xs text-red-500">{errors.name.message}</span>}
           </div>
 
           <div>
             <Label htmlFor="baseUrl">Base URL</Label>
-            <Input
-              id="baseUrl"
-              {...register('baseUrl')}
-              placeholder="https://api.example.com"
-            />
+            <Input id="baseUrl" {...register('baseUrl')} placeholder="https://api.example.com" />
             {errors.baseUrl && (
               <span className="text-xs text-red-500">{errors.baseUrl.message}</span>
             )}
@@ -114,28 +100,19 @@ export function ProfileDialog({ open, onClose, profile }: ProfileDialogProps) {
           <div>
             <Label htmlFor="apiKey">API Key</Label>
             <Input id="apiKey" type="password" {...register('apiKey')} />
-            {errors.apiKey && (
-              <span className="text-xs text-red-500">{errors.apiKey.message}</span>
-            )}
+            {errors.apiKey && <span className="text-xs text-red-500">{errors.apiKey.message}</span>}
           </div>
 
           <div>
             <Label htmlFor="model">Model (optional)</Label>
-            <Input
-              id="model"
-              {...register('model')}
-              placeholder="claude-sonnet-4-5-20250929"
-            />
+            <Input id="model" {...register('model')} placeholder="claude-sonnet-4-5-20250929" />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending
                 ? 'Saving...'
                 : profile

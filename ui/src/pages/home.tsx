@@ -1,29 +1,27 @@
-import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatCard } from '@/components/stat-card'
-import { Key, Zap, Users, Activity, Plus, Stethoscope, BookOpen, FolderOpen } from 'lucide-react'
-import { useOverview } from '@/hooks/use-overview'
-import { useSharedSummary } from '@/hooks/use-shared'
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/stat-card';
+import { Key, Zap, Users, Activity, Plus, Stethoscope, BookOpen, FolderOpen } from 'lucide-react';
+import { useOverview } from '@/hooks/use-overview';
+import { useSharedSummary } from '@/hooks/use-shared';
 
 export function HomePage() {
-  const navigate = useNavigate()
-  const { data: overview } = useOverview()
-  const { data: shared } = useSharedSummary()
+  const navigate = useNavigate();
+  const { data: overview } = useOverview();
+  const { data: shared } = useSharedSummary();
 
   const healthColor = {
     ok: 'text-green-500',
     warning: 'text-yellow-500',
     error: 'text-red-500',
-  }
+  };
 
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Welcome to CCS Config</h1>
-        <p className="text-muted-foreground">
-          Manage your Claude Code Switch configuration
-        </p>
+        <p className="text-muted-foreground">Manage your Claude Code Switch configuration</p>
       </div>
 
       {/* Stats Grid */}
@@ -68,7 +66,11 @@ export function HomePage() {
             <Stethoscope className="w-4 h-4 mr-2" /> Run Doctor
           </Button>
           <Button variant="outline" asChild>
-            <a href="https://github.com/anthropics/claude-cli" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://github.com/anthropics/claude-cli"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <BookOpen className="w-4 h-4 mr-2" /> Documentation
             </a>
           </Button>
@@ -100,12 +102,14 @@ export function HomePage() {
             </div>
           </div>
           {shared?.symlinkStatus && (
-            <p className={`text-xs mt-2 ${shared.symlinkStatus.valid ? 'text-green-600' : 'text-yellow-600'}`}>
+            <p
+              className={`text-xs mt-2 ${shared.symlinkStatus.valid ? 'text-green-600' : 'text-yellow-600'}`}
+            >
               {shared.symlinkStatus.message}
             </p>
           )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

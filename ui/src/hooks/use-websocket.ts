@@ -22,6 +22,42 @@ export function useWebSocket() {
   const queryClient = useQueryClient();
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectRef = useRef<() => void>(() => {});
+
+  const handleMessage = useCallback(
+    (message: WSMessage) => {
+      switch (message.type) {
+        case 'connected':
+          console.log('[WS] Server acknowledged connection');
+          break;
+
+        case 'config-changed':
+          queryClient.invalidateQueries({ queryKey: ['profiles'] });
+          queryClient.invalidateQueries({ queryKey: ['cliproxy'] });
+          toast.info('Configuration updated externally');
+          break;
+
+        case 'settings-changed':
+          queryClient.invalidateQueries({ queryKey: ['profiles'] });
+          toast.info('Settings file updated');
+          break;
+
+        case 'profiles-changed':
+          queryClient.invalidateQueries({ queryKey: ['accounts'] });
+          toast.info('Accounts updated');
+          break;
+
+        case 'pong':
+          // Heartbeat response
+          break;
+
+        default:
+          console.log(`[WS] Unknown message: ${message.type}`);
+      }
+    },
+    [queryClient]
+  );
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -56,56 +92,36 @@ export function useWebSocket() {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
         reconnectAttempts.current++;
         console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`);
-        setTimeout(connect, delay);
+        // Use ref to avoid stale closure
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectRef.current();
+        }, delay);
       }
     };
 
     ws.onerror = () => {
       console.log('[WS] Connection error');
     };
-  }, []);
+  }, [handleMessage]);
 
-  const handleMessage = (message: WSMessage) => {
-    switch (message.type) {
-      case 'connected':
-        console.log('[WS] Server acknowledged connection');
-        break;
-
-      case 'config-changed':
-        queryClient.invalidateQueries({ queryKey: ['profiles'] });
-        queryClient.invalidateQueries({ queryKey: ['cliproxy'] });
-        toast.info('Configuration updated externally');
-        break;
-
-      case 'settings-changed':
-        queryClient.invalidateQueries({ queryKey: ['profiles'] });
-        toast.info('Settings file updated');
-        break;
-
-      case 'profiles-changed':
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        toast.info('Accounts updated');
-        break;
-
-      case 'pong':
-        // Heartbeat response
-        break;
-
-      default:
-        console.log(`[WS] Unknown message: ${message.type}`);
-    }
-  };
+  // Keep ref in sync
+  connectRef.current = connect;
 
   const disconnect = useCallback(() => {
     reconnectAttempts.current = maxReconnectAttempts; // Prevent reconnect
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     wsRef.current?.close();
   }, []);
 
-  // Connect on mount, disconnect on unmount
+  // Initial connection - use ref to satisfy linter
   useEffect(() => {
-    connect();
+    connectRef.current();
     return () => disconnect();
-  }, [connect, disconnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Heartbeat to keep connection alive
   useEffect(() => {

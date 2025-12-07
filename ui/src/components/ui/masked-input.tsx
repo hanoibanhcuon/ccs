@@ -1,24 +1,20 @@
-import { useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Eye, EyeOff } from 'lucide-react'
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface MaskedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string
+  label?: string;
 }
 
 export function MaskedInput({ label, ...props }: MaskedInputProps) {
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(false);
 
   return (
     <div className="space-y-1">
       {label && <label className="text-sm font-medium">{label}</label>}
       <div className="relative">
-        <Input
-          type={visible ? 'text' : 'password'}
-          className="pr-10 font-mono"
-          {...props}
-        />
+        <Input type={visible ? 'text' : 'password'} className="pr-10 font-mono" {...props} />
         <Button
           type="button"
           variant="ghost"
@@ -31,5 +27,5 @@ export function MaskedInput({ label, ...props }: MaskedInputProps) {
         </Button>
       </div>
     </div>
-  )
+  );
 }

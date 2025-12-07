@@ -47,11 +47,7 @@ export function ApiPage() {
         <ProfilesTable data={data?.profiles || []} onEdit={handleEdit} />
       )}
 
-      <ProfileDialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        profile={editingProfile}
-      />
+      <ProfileDialog open={dialogOpen} onClose={handleCloseDialog} profile={editingProfile} />
     </div>
   );
 }

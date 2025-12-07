@@ -1,15 +1,21 @@
-import { Card, CardContent } from '@/components/ui/card'
-import { LucideIcon } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card';
+import type { LucideIcon } from 'lucide-react';
 
 interface StatCardProps {
-  title: string
-  value: number | string
-  icon: LucideIcon
-  color?: string
-  onClick?: () => void
+  title: string;
+  value: number | string;
+  icon: LucideIcon;
+  color?: string;
+  onClick?: () => void;
 }
 
-export function StatCard({ title, value, icon: Icon, color = 'text-primary', onClick }: StatCardProps) {
+export function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color = 'text-primary',
+  onClick,
+}: StatCardProps) {
   return (
     <Card
       className={`cursor-pointer hover:shadow-md transition-shadow ${onClick ? 'hover:border-primary' : ''}`}
@@ -25,5 +31,5 @@ export function StatCard({ title, value, icon: Icon, color = 'text-primary', onC
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

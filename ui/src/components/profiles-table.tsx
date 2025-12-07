@@ -3,12 +3,7 @@
  * Phase 03: REST API Routes & CRUD
  */
 
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  type ColumnDef,
-} from '@tanstack/react-table';
+import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from '@tanstack/react-table';
 import {
   Table,
   TableBody,

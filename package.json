@@ -72,6 +72,7 @@
     "ui:dev": "cd ui && bun run dev",
     "ui:build": "cd ui && bun run build",
     "ui:preview": "cd ui && bun run preview",
+    "ui:validate": "cd ui && bun run validate",
     "prepublishOnly": "bun run validate && node scripts/sync-version.js",
     "prepack": "bun run validate && node scripts/sync-version.js",
     "prepare": "husky",

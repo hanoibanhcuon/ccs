@@ -1,54 +1,52 @@
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { MaskedInput } from '@/components/ui/masked-input'
-import { ConfirmDialog } from '@/components/confirm-dialog'
-import { Edit, Save, X } from 'lucide-react'
-import { toast } from 'sonner'
-import { api } from '@/lib/api-client'
+import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MaskedInput } from '@/components/ui/masked-input';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Edit, Save, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api-client';
 
 interface Settings {
-  env?: Record<string, string>
+  env?: Record<string, string>;
 }
 
 interface SettingsResponse {
-  profile: string
-  settings: Settings
-  mtime: number
-  path: string
+  profile: string;
+  settings: Settings;
+  mtime: number;
+  path: string;
 }
 
 export function SettingsPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const profile = searchParams.get('profile')
-  const [editMode, setEditMode] = useState(false)
-  const [editedSettings, setEditedSettings] = useState<Settings | null>(null)
-  const [conflictDialog, setConflictDialog] = useState(false)
-  const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams();
+  const profile = searchParams.get('profile');
+  const [editMode, setEditMode] = useState(false);
+  const [editedSettings, setEditedSettings] = useState<Settings | null>(null);
+  const [conflictDialog, setConflictDialog] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch profiles for selector
   const { data: profilesData } = useQuery({
     queryKey: ['profiles'],
     queryFn: () => api.profiles.list(),
-  })
+  });
 
   // Fetch settings for selected profile
   const { data, isLoading, refetch } = useQuery<SettingsResponse>({
     queryKey: ['settings', profile],
-    queryFn: () => fetch(`/api/settings/${profile}/raw`).then(r => r.json()),
+    queryFn: () => fetch(`/api/settings/${profile}/raw`).then((r) => r.json()),
     enabled: !!profile,
-  })
+  });
 
-  // Initialize edited settings when data loads
-  useEffect(() => {
-    if (data?.settings) {
-      setEditedSettings(data.settings)
-    }
-  }, [data])
+  // Use edited settings when in edit mode, otherwise use data directly
+  const currentSettings = useMemo(() => {
+    return editMode && editedSettings ? editedSettings : data?.settings;
+  }, [editMode, editedSettings, data?.settings]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -60,50 +58,49 @@ export function SettingsPage() {
           settings: editedSettings,
           expectedMtime: data?.mtime,
         }),
-      })
+      });
 
       if (res.status === 409) {
-        throw new Error('CONFLICT')
+        throw new Error('CONFLICT');
       }
 
       if (!res.ok) {
-        throw new Error('Failed to save')
+        throw new Error('Failed to save');
       }
 
-      return res.json()
+      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings', profile] })
-      setEditMode(false)
-      toast.success('Settings saved')
+      queryClient.invalidateQueries({ queryKey: ['settings', profile] });
+      setEditedSettings(null);
+      setEditMode(false);
+      toast.success('Settings saved');
     },
     onError: (error: Error) => {
       if (error.message === 'CONFLICT') {
-        setConflictDialog(true)
+        setConflictDialog(true);
       } else {
-        toast.error(error.message)
+        toast.error(error.message);
       }
     },
-  })
+  });
 
   const handleSave = () => {
-    saveMutation.mutate()
-  }
+    saveMutation.mutate();
+  };
 
   const handleConflictResolve = async (overwrite: boolean) => {
-    setConflictDialog(false)
+    setConflictDialog(false);
     if (overwrite) {
       // Refetch to get new mtime, then save
-      await refetch()
-      saveMutation.mutate()
+      await refetch();
+      saveMutation.mutate();
     } else {
       // Discard local changes
-      if (data?.settings) {
-        setEditedSettings(data.settings)
-      }
-      setEditMode(false)
+      setEditedSettings(null);
+      setEditMode(false);
     }
-  }
+  };
 
   const updateEnvValue = (key: string, value: string) => {
     setEditedSettings((prev) => ({
@@ -112,8 +109,8 @@ export function SettingsPage() {
         ...prev?.env,
         [key]: value,
       },
-    }))
-  }
+    }));
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -122,11 +119,15 @@ export function SettingsPage() {
         <select
           className="border rounded px-3 py-2"
           value={profile || ''}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSearchParams({ profile: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+            setSearchParams({ profile: e.target.value })
+          }
         >
           <option value="">Select profile...</option>
           {profilesData?.profiles.map((p) => (
-            <option key={p.name} value={p.name}>{p.name}</option>
+            <option key={p.name} value={p.name}>
+              {p.name}
+            </option>
           ))}
         </select>
       </div>
@@ -147,21 +148,30 @@ export function SettingsPage() {
         </Card>
       )}
 
-      {profile && data && editedSettings && (
+      {profile && data && currentSettings && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Environment Variables</CardTitle>
             <div className="flex gap-2">
               {!editMode ? (
-                <Button variant="outline" onClick={() => setEditMode(true)}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditedSettings(data.settings);
+                    setEditMode(true);
+                  }}
+                >
                   <Edit className="w-4 h-4 mr-2" /> Edit
                 </Button>
               ) : (
                 <>
-                  <Button variant="outline" onClick={() => {
-                    setEditedSettings(data.settings)
-                    setEditMode(false)
-                  }}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditedSettings(null);
+                      setEditMode(false);
+                    }}
+                  >
                     <X className="w-4 h-4 mr-2" /> Cancel
                   </Button>
                   <Button onClick={handleSave} disabled={saveMutation.isPending}>
@@ -173,7 +183,7 @@ export function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(editedSettings.env || {}).map(([key, value]) => (
+            {Object.entries(currentSettings.env || {}).map(([key, value]) => (
               <div key={key}>
                 <Label>{key}</Label>
                 {key.includes('TOKEN') || key.includes('KEY') ? (
@@ -211,5 +221,5 @@ export function SettingsPage() {
         onCancel={() => handleConflictResolve(false)}
       />
     </div>
-  )
+  );
 }

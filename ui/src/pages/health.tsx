@@ -1,14 +1,14 @@
-import { Button } from '@/components/ui/button'
-import { RefreshCw } from 'lucide-react'
-import { HealthCard } from '@/components/health-card'
-import { useHealth } from '@/hooks/use-health'
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+import { HealthCard } from '@/components/health-card';
+import { useHealth } from '@/hooks/use-health';
 
 export function HealthPage() {
-  const { data, isLoading, refetch, dataUpdatedAt } = useHealth()
+  const { data, isLoading, refetch, dataUpdatedAt } = useHealth();
 
   const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString()
-  }
+    return new Date(timestamp).toLocaleTimeString();
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -16,16 +16,10 @@ export function HealthPage() {
         <div>
           <h1 className="text-2xl font-bold">Health Dashboard</h1>
           {dataUpdatedAt && (
-            <p className="text-sm text-muted-foreground">
-              Last check: {formatTime(dataUpdatedAt)}
-            </p>
+            <p className="text-sm text-muted-foreground">Last check: {formatTime(dataUpdatedAt)}</p>
           )}
         </div>
-        <Button
-          variant="outline"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
+        <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -48,9 +42,7 @@ export function HealthPage() {
         </div>
       )}
 
-      {isLoading && !data && (
-        <div className="text-muted-foreground">Running health checks...</div>
-      )}
+      {isLoading && !data && <div className="text-muted-foreground">Running health checks...</div>}
 
       {data && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -60,5 +52,5 @@ export function HealthPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

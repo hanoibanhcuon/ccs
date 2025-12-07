@@ -1,21 +1,21 @@
-import { useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { useSharedItems, useSharedSummary } from '@/hooks/use-shared'
-import { FileText, Sparkles, Bot, AlertTriangle } from 'lucide-react'
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useSharedItems, useSharedSummary } from '@/hooks/use-shared';
+import { FileText, Sparkles, Bot, AlertTriangle } from 'lucide-react';
 
-type TabType = 'commands' | 'skills' | 'agents'
+type TabType = 'commands' | 'skills' | 'agents';
 
 export function SharedPage() {
-  const [tab, setTab] = useState<TabType>('commands')
-  const { data: summary } = useSharedSummary()
-  const { data: items, isLoading } = useSharedItems(tab)
+  const [tab, setTab] = useState<TabType>('commands');
+  const { data: summary } = useSharedSummary();
+  const { data: items, isLoading } = useSharedItems(tab);
 
   const tabs: { id: TabType; label: string; icon: typeof FileText; count: number }[] = [
     { id: 'commands', label: 'Commands', icon: FileText, count: summary?.commands ?? 0 },
     { id: 'skills', label: 'Skills', icon: Sparkles, count: summary?.skills ?? 0 },
     { id: 'agents', label: 'Agents', icon: Bot, count: summary?.agents ?? 0 },
-  ]
+  ];
 
   return (
     <div className="p-6 space-y-6">
@@ -65,9 +65,7 @@ export function SharedPage() {
               <Card key={item.name}>
                 <CardContent className="pt-4">
                   <div className="font-medium">{item.name}</div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {item.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                   <p className="text-xs text-muted-foreground mt-2 font-mono truncate">
                     {item.path}
                   </p>
@@ -78,5 +76,5 @@ export function SharedPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

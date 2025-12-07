@@ -1,15 +1,15 @@
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { CheckCircle, AlertTriangle, XCircle, Wrench } from 'lucide-react'
-import { useFixHealth } from '@/hooks/use-health'
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, AlertTriangle, XCircle, Wrench } from 'lucide-react';
+import { useFixHealth } from '@/hooks/use-health';
 
 interface HealthCheck {
-  id: string
-  name: string
-  status: 'ok' | 'warning' | 'error'
-  message: string
-  details?: string
-  fixable?: boolean
+  id: string;
+  name: string;
+  status: 'ok' | 'warning' | 'error';
+  message: string;
+  details?: string;
+  fixable?: boolean;
 }
 
 const statusConfig = {
@@ -31,12 +31,12 @@ const statusConfig = {
     bg: 'bg-red-50 dark:bg-red-900/20',
     border: 'border-red-200 dark:border-red-800',
   },
-}
+};
 
 export function HealthCard({ check }: { check: HealthCheck }) {
-  const fixMutation = useFixHealth()
-  const config = statusConfig[check.status]
-  const Icon = config.icon
+  const fixMutation = useFixHealth();
+  const config = statusConfig[check.status];
+  const Icon = config.icon;
 
   return (
     <Card className={`${config.bg} ${config.border} border`}>
@@ -60,11 +60,9 @@ export function HealthCard({ check }: { check: HealthCheck }) {
         </div>
         <p className="text-sm text-muted-foreground mt-2">{check.message}</p>
         {check.details && (
-          <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
-            {check.details}
-          </p>
+          <p className="text-xs text-muted-foreground mt-1 font-mono truncate">{check.details}</p>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

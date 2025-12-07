@@ -7,16 +7,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+} from '@/components/ui/alert-dialog';
 
 interface ConfirmDialogProps {
-  open: boolean
-  onConfirm: () => void
-  onCancel: () => void
-  title: string
-  description: string
-  confirmText?: string
-  variant?: 'default' | 'destructive'
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  title: string;
+  description: string;
+  confirmText?: string;
+  variant?: 'default' | 'destructive';
 }
 
 export function ConfirmDialog({
@@ -46,5 +46,5 @@ export function ConfirmDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }
