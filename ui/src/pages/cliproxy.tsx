@@ -7,12 +7,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Plus, Check, X, User, ChevronDown, Star, Trash2 } from 'lucide-react';
 import { CliproxyTable } from '@/components/cliproxy-table';
@@ -40,10 +40,10 @@ function AccountBadge({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border transition-colors hover:bg-muted/50 ${
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors hover:bg-muted/80 ${
             account.isDefault
-              ? 'border-primary/30 bg-primary/5 text-primary'
-              : 'border-muted bg-muted/20'
+              ? 'border-primary/30 bg-primary/10 text-primary font-medium'
+              : 'border-muted bg-muted/40'
           }`}
         >
           <User className="w-3 h-3" />
@@ -52,16 +52,15 @@ function AccountBadge({
           <ChevronDown className="w-3 h-3 opacity-50" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-48">
-        <div className="px-2 py-1.5 text-xs text-muted-foreground">
-          {account.email || account.id}
+      <DropdownMenuContent align="start" className="w-56">
+        <div className="px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 -mx-1 -mt-1 mb-1 border-b">
+          <div className="font-medium text-foreground mb-0.5 truncate">
+            {account.email || account.id}
+          </div>
           {account.lastUsedAt && (
-            <div className="mt-0.5">
-              Last used: {new Date(account.lastUsedAt).toLocaleDateString()}
-            </div>
+            <div>Last used: {new Date(account.lastUsedAt).toLocaleDateString()}</div>
           )}
         </div>
-        <DropdownMenuSeparator />
         {!account.isDefault && (
           <DropdownMenuItem onClick={onSetDefault}>
             <Star className="w-4 h-4 mr-2" />
@@ -69,7 +68,7 @@ function AccountBadge({
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
-          className="text-red-600 focus:text-red-600"
+          className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
           onClick={onRemove}
           disabled={isRemoving}
         >
@@ -81,7 +80,7 @@ function AccountBadge({
   );
 }
 
-function ProviderCard({
+function ProviderRow({
   status,
   setDefaultMutation,
   removeMutation,
@@ -91,79 +90,85 @@ function ProviderCard({
   removeMutation: ReturnType<typeof useRemoveAccount>;
 }) {
   const accounts = status.accounts || [];
-  const hasMultipleAccounts = accounts.length > 1;
 
   return (
-    <div
-      className={`p-4 rounded-lg border ${
-        status.authenticated ? 'border-green-500/30 bg-green-500/5' : 'border-muted bg-muted/5'
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {status.authenticated ? (
-            <Check className="w-4 h-4 text-green-500" />
-          ) : (
-            <X className="w-4 h-4 text-muted-foreground" />
-          )}
-          <span className="font-medium">{status.displayName}</span>
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b last:border-0 hover:bg-muted/5 transition-colors gap-4">
+      <div className="flex items-center gap-4 min-w-[180px]">
+        <div
+          className={`flex items-center justify-center w-8 h-8 rounded-full ${
+            status.authenticated
+              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+              : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {status.authenticated ? <Check className="w-5 h-5" /> : <X className="w-5 h-5" />}
         </div>
-        {accounts.length > 0 && (
-          <Badge variant="secondary" className="text-xs">
-            {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-          </Badge>
+        <div>
+          <div className="font-medium flex items-center gap-2">
+            {status.displayName}
+            {accounts.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal">
+                {accounts.length}
+              </Badge>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">{status.provider}</div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex items-center gap-2 flex-wrap">
+        {status.authenticated && accounts.length > 0 ? (
+          accounts.map((account) => (
+            <AccountBadge
+              key={account.id}
+              account={account}
+              onSetDefault={() =>
+                setDefaultMutation.mutate({
+                  provider: status.provider,
+                  accountId: account.id,
+                })
+              }
+              onRemove={() =>
+                removeMutation.mutate({
+                  provider: status.provider,
+                  accountId: account.id,
+                })
+              }
+              isRemoving={removeMutation.isPending}
+            />
+          ))
+        ) : (
+          <div className="text-sm text-muted-foreground italic">
+            {status.authenticated
+              ? 'Authenticated (No specific accounts tracked)'
+              : 'Not authenticated'}
+          </div>
         )}
       </div>
 
-      {status.authenticated ? (
-        <div className="mt-2">
-          {accounts.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {accounts.map((account) => (
-                <AccountBadge
-                  key={account.id}
-                  account={account}
-                  onSetDefault={() =>
-                    setDefaultMutation.mutate({
-                      provider: status.provider,
-                      accountId: account.id,
-                    })
-                  }
-                  onRemove={() =>
-                    removeMutation.mutate({
-                      provider: status.provider,
-                      accountId: account.id,
-                    })
-                  }
-                  isRemoving={removeMutation.isPending}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              Authenticated
-              {status.lastAuth && (
-                <span className="ml-1">({new Date(status.lastAuth).toLocaleDateString()})</span>
-              )}
-            </div>
-          )}
-          {hasMultipleAccounts && (
-            <div className="mt-2 text-xs text-muted-foreground">
-              Click account to manage. Star = default.
-            </div>
-          )}
-          <div className="mt-2 text-xs text-muted-foreground">
-            Add account: <code className="bg-muted px-1 rounded">ccs {status.provider} --auth</code>
+      <div className="flex items-center gap-2">
+        {!status.authenticated && (
+          <div className="text-xs font-mono bg-muted px-2 py-1 rounded text-muted-foreground select-all">
+            ccs {status.provider} --auth
           </div>
-        </div>
-      ) : (
-        <div className="mt-1 text-sm text-muted-foreground">
-          Not authenticated
-          <span className="block text-xs mt-1">
-            Run: <code className="bg-muted px-1 rounded">ccs {status.provider} --auth</code>
-          </span>
-        </div>
-      )}
+        )}
+        {status.authenticated && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => {
+              // This is a placeholder since we can't actually run the auth command from UI easily without a terminal
+              // But we can show the command to run
+              navigator.clipboard.writeText(`ccs ${status.provider} --auth`);
+            }}
+            title="Copy auth command"
+          >
+            <Plus className="w-3 h-3" />
+            Add Account
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -176,12 +181,12 @@ export function CliproxyPage() {
   const removeMutation = useRemoveAccount();
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 max-w-6xl mx-auto space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">CLIProxy</h1>
+          <h1 className="text-2xl font-bold tracking-tight">CLIProxy</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage OAuth-based provider variants with multi-account support
+            Manage OAuth-based provider variants and multi-account configurations
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
@@ -191,27 +196,47 @@ export function CliproxyPage() {
       </div>
 
       {/* Built-in Profiles with Account Management */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Built-in Profiles & Accounts</h2>
-        {authLoading ? (
-          <div className="text-muted-foreground">Loading auth status...</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {authData?.authStatus.map((status) => (
-              <ProviderCard
-                key={status.provider}
-                status={status}
-                setDefaultMutation={setDefaultMutation}
-                removeMutation={removeMutation}
-              />
-            ))}
-          </div>
-        )}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Built-in Providers</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage authentication status and accounts for built-in providers.
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            {authLoading ? (
+              <div className="p-8 text-center text-muted-foreground">
+                Loading authentication status...
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {authData?.authStatus.map((status) => (
+                  <ProviderRow
+                    key={status.provider}
+                    status={status}
+                    setDefaultMutation={setDefaultMutation}
+                    removeMutation={removeMutation}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Custom Variants */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Custom Variants</h2>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Custom Variants</h2>
+            <p className="text-sm text-muted-foreground">
+              Create custom aliases for providers with specific accounts.
+            </p>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="text-muted-foreground">Loading variants...</div>
         ) : (

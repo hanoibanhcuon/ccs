@@ -44,6 +44,7 @@ export function CliproxyTable({ data }: CliproxyTableProps) {
     {
       accessorKey: 'name',
       header: 'Name',
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
     {
       accessorKey: 'provider',
@@ -56,11 +57,11 @@ export function CliproxyTable({ data }: CliproxyTableProps) {
       cell: ({ row }) => {
         const account = row.original.account;
         if (!account) {
-          return <span className="text-muted-foreground text-xs">default</span>;
+          return <span className="text-muted-foreground text-xs italic">default</span>;
         }
         return (
           <Badge variant="secondary" className="text-xs font-normal">
-            <User className="w-3 h-3 mr-1" />
+            <User className="w-3 h-3 mr-1 opacity-70" />
             {account}
           </Badge>
         );
@@ -69,27 +70,35 @@ export function CliproxyTable({ data }: CliproxyTableProps) {
     {
       accessorKey: 'settings',
       header: 'Settings Path',
+      cell: ({ row }) => (
+        <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+          {row.original.settings || `config.cliproxy.${row.original.name}`}
+        </code>
+      ),
     },
     {
       id: 'actions',
       header: 'Actions',
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="text-red-600"
-              onClick={() => deleteMutation.mutate(row.original.name)}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-950">
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                onClick={() => deleteMutation.mutate(row.original.name)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ),
     },
   ];
@@ -103,16 +112,19 @@ export function CliproxyTable({ data }: CliproxyTableProps) {
 
   if (data.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        No CLIProxy variants found. Create one to use OAuth-based providers.
+      <div className="text-center py-12 border rounded-lg bg-muted/5 border-dashed">
+        <div className="text-muted-foreground text-sm">No CLIProxy variants found.</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Create one to use OAuth-based providers with specific account configurations.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-md">
+    <div className="border rounded-md overflow-hidden bg-card">
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted/50">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
