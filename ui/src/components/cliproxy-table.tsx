@@ -1,6 +1,7 @@
 /**
  * CLIProxy Variants Table Component
  * Phase 03: REST API Routes & CRUD
+ * Phase 06: Multi-Account Support
  */
 
 import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from '@tanstack/react-table';
@@ -13,13 +14,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, User } from 'lucide-react';
 import { useDeleteVariant } from '@/hooks/use-cliproxy';
 import type { Variant } from '@/lib/api-client';
 
@@ -32,6 +34,7 @@ const providerLabels: Record<string, string> = {
   codex: 'OpenAI Codex',
   agy: 'Antigravity',
   qwen: 'Alibaba Qwen',
+  iflow: 'iFlow',
 };
 
 export function CliproxyTable({ data }: CliproxyTableProps) {
@@ -46,6 +49,22 @@ export function CliproxyTable({ data }: CliproxyTableProps) {
       accessorKey: 'provider',
       header: 'Provider',
       cell: ({ row }) => providerLabels[row.original.provider] || row.original.provider,
+    },
+    {
+      accessorKey: 'account',
+      header: 'Account',
+      cell: ({ row }) => {
+        const account = row.original.account;
+        if (!account) {
+          return <span className="text-muted-foreground text-xs">default</span>;
+        }
+        return (
+          <Badge variant="secondary" className="text-xs font-normal">
+            <User className="w-3 h-3 mr-1" />
+            {account}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: 'settings',
