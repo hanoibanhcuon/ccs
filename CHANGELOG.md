@@ -1,3 +1,17 @@
+# [5.11.0](https://github.com/kaitranntt/ccs/compare/v5.10.0...v5.11.0) (2025-12-08)
+
+
+### Bug Fixes
+
+* **cliproxy:** map token type values to provider names for account discovery ([17caf80](https://github.com/kaitranntt/ccs/commit/17caf804ba02cab878b3f1476ec02f0f0697d6f1))
+* **ui:** improve cliproxy dashboard layout and dropdown styling ([10d0550](https://github.com/kaitranntt/ccs/commit/10d05502f305f5f351562da8b0aa2b64dca41a4c))
+* **ui:** remove padding from cliproxy card ([3a1e8c0](https://github.com/kaitranntt/ccs/commit/3a1e8c0afc69b1ca612a267e373b62f80a34c8ce))
+
+
+### Features
+
+* **cliproxy:** add multi-account support for CLIProxy providers ([4dc17fa](https://github.com/kaitranntt/ccs/commit/4dc17fac4f655e31afc0e491aa43f7a9c3f64df1))
+
 # [5.10.0](https://github.com/kaitranntt/ccs/compare/v5.9.0...v5.10.0) (2025-12-08)
 
 
