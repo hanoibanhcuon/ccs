@@ -47,6 +47,10 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   const { overviewRoutes } = await import('./overview-routes');
   app.use('/api/overview', overviewRoutes);
 
+  // Usage analytics routes
+  const { usageRoutes } = await import('./usage-routes');
+  app.use('/api/usage', usageRoutes);
+
   // Dev mode: use Vite middleware for HMR
   if (options.dev) {
     const { createServer: createViteServer } = await import('vite');
