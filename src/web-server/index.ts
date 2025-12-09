@@ -77,6 +77,13 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   // Start listening
   return new Promise<ServerInstance>((resolve) => {
     server.listen(options.port, () => {
+      // Non-blocking prewarm: load usage cache in background
+      import('./usage-routes').then(({ prewarmUsageCache }) => {
+        prewarmUsageCache().catch(() => {
+          // Error already logged in prewarmUsageCache
+        });
+      });
+
       resolve({ server, wss, cleanup });
     });
   });

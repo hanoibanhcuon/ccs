@@ -65,6 +65,11 @@ export interface UsageQueryOptions {
   offset?: number;
 }
 
+export interface UsageStatus {
+  lastFetch: number | null;
+  cacheSize: number;
+}
+
 // API
 const BASE_URL = '/api';
 
@@ -125,6 +130,8 @@ export const usageApi = {
       throw new Error('Failed to refresh usage cache');
     }
   },
+  /** Get cache status including last fetch timestamp */
+  status: () => request<UsageStatus>('/usage/status'),
 };
 
 // Helper function to match existing API client pattern
@@ -199,4 +206,17 @@ export function useRefreshUsage() {
   }, [queryClient]);
 
   return refresh;
+}
+
+/**
+ * Hook to get usage cache status
+ * Returns last fetch timestamp for "Last updated" UI indicator
+ */
+export function useUsageStatus() {
+  return useQuery({
+    queryKey: ['usage', 'status'],
+    queryFn: () => usageApi.status(),
+    staleTime: 10 * 1000, // 10 seconds - poll frequently for updates
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+  });
 }

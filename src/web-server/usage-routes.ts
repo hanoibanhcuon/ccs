@@ -50,6 +50,17 @@ const CACHE_TTL = {
   session: 60 * 1000, // 1 minute - user may refresh
 };
 
+// Stale-while-revalidate: max age for stale data (1 hour)
+const STALE_TTL = 60 * 60 * 1000;
+
+// Track when data was last fetched (for UI indicator)
+let lastFetchTimestamp: number | null = null;
+
+/** Get timestamp of last successful data fetch */
+export function getLastFetchTimestamp(): number | null {
+  return lastFetchTimestamp;
+}
+
 // In-memory cache
 const cache = new Map<string, CacheEntry<unknown>>();
 
@@ -59,15 +70,38 @@ const pendingRequests = new Map<string, Promise<unknown>>();
 /**
  * Get cached data or fetch from loader with TTL
  * Also coalesces concurrent requests to prevent duplicate library calls
+ * Implements stale-while-revalidate pattern for instant responses
  */
 async function getCachedData<T>(key: string, ttl: number, loader: () => Promise<T>): Promise<T> {
-  // Check cache first
   const cached = cache.get(key) as CacheEntry<T> | undefined;
-  if (cached && Date.now() - cached.timestamp < ttl) {
+  const now = Date.now();
+
+  // Fresh cache - return immediately
+  if (cached && now - cached.timestamp < ttl) {
     return cached.data;
   }
 
-  // Check if request is already pending (coalesce)
+  // Stale cache - return immediately, refresh in background (SWR pattern)
+  if (cached && now - cached.timestamp < STALE_TTL) {
+    // Fire and forget background refresh if not already pending
+    if (!pendingRequests.has(key)) {
+      const promise = loader()
+        .then((data) => {
+          cache.set(key, { data, timestamp: Date.now() });
+          lastFetchTimestamp = Date.now();
+        })
+        .catch((err) => {
+          console.error(`[!] Background refresh failed for ${key}:`, err);
+        })
+        .finally(() => {
+          pendingRequests.delete(key);
+        });
+      pendingRequests.set(key, promise);
+    }
+    return cached.data;
+  }
+
+  // No usable cache - check if request is already pending (coalesce)
   const pending = pendingRequests.get(key) as Promise<T> | undefined;
   if (pending) {
     return pending;
@@ -77,6 +111,7 @@ async function getCachedData<T>(key: string, ttl: number, loader: () => Promise<
   const promise = loader()
     .then((data) => {
       cache.set(key, { data, timestamp: Date.now() });
+      lastFetchTimestamp = Date.now();
       return data;
     })
     .finally(() => {
@@ -113,6 +148,28 @@ async function getCachedSessionData(): Promise<SessionUsage[]> {
  */
 export function clearUsageCache(): void {
   cache.clear();
+}
+
+/**
+ * Pre-warm usage caches on server startup
+ * Loads all usage data into cache so first user request is instant
+ * Returns timestamp when cache was populated
+ */
+export async function prewarmUsageCache(): Promise<{ timestamp: number; elapsed: number }> {
+  const start = Date.now();
+  console.log('[i] Pre-warming usage cache...');
+
+  try {
+    await Promise.all([getCachedDailyData(), getCachedMonthlyData(), getCachedSessionData()]);
+
+    const elapsed = Date.now() - start;
+    lastFetchTimestamp = Date.now();
+    console.log(`[OK] Usage cache ready (${elapsed}ms)`);
+    return { timestamp: lastFetchTimestamp, elapsed };
+  } catch (err) {
+    console.error('[!] Failed to prewarm usage cache:', err);
+    throw err;
+  }
 }
 
 // ============================================================================
@@ -492,5 +549,21 @@ usageRoutes.post('/refresh', (_req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Usage cache cleared',
+  });
+});
+
+/**
+ * GET /api/usage/status
+ *
+ * Returns cache status including last fetch timestamp.
+ * Used by UI to show "Last updated: X ago" indicator.
+ */
+usageRoutes.get('/status', (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      lastFetch: lastFetchTimestamp,
+      cacheSize: cache.size,
+    },
   });
 });

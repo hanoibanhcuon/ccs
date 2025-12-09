@@ -38,7 +38,7 @@ export function UsageTrendChart({
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
-    return data.map((item) => ({
+    return [...data].reverse().map((item) => ({
       ...item,
       dateFormatted: formatDate(item.date, granularity),
       costRounded: Number(item.cost.toFixed(4)),

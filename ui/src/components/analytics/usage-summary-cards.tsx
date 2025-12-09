@@ -73,19 +73,19 @@ export function UsageSummaryCards({ data, isLoading }: UsageSummaryCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (
           <Card key={index} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
-                  <p className="text-2xl font-bold">{card.format(card.value)}</p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground truncate">{card.title}</p>
+                  <p className="text-xl font-bold truncate">{card.format(card.value)}</p>
                 </div>
-                <div className={cn('p-2 rounded-lg', card.bgColor)}>
-                  <Icon className={cn('h-5 w-5', card.color)} />
+                <div className={cn('p-2 rounded-lg shrink-0', card.bgColor)}>
+                  <Icon className={cn('h-4 w-4', card.color)} />
                 </div>
               </div>
             </CardContent>

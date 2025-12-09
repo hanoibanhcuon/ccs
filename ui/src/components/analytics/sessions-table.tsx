@@ -33,7 +33,7 @@ export function SessionsTable({ data, isLoading }: SessionsTableProps) {
   const [currentPage, setCurrentPage] = useState(0);
 
   // Get sessions array (stable reference for memoization)
-  const sessions = data?.sessions ?? [];
+  const sessions = useMemo(() => data?.sessions ?? [], [data?.sessions]);
 
   // Filter sessions based on search term
   const filteredSessions = useMemo(() => {

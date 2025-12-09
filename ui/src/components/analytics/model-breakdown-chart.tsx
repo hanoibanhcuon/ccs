@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ModelUsage } from '@/hooks/use-usage';
 import { cn } from '@/lib/utils';
@@ -66,24 +66,23 @@ export function ModelBreakdownChart({ data, isLoading, className }: ModelBreakdo
 
     const data = payloadArray[0].payload;
     return (
-      <div className="rounded-lg border bg-background p-3 shadow-lg">
-        <p className="font-medium mb-2">{data.name}</p>
-        <p className="text-sm text-muted-foreground">
-          Tokens: {formatNumber(data.value)} ({data.percentage.toFixed(1)}%)
+      <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
+        <p className="font-medium mb-1">{data.name}</p>
+        <p className="text-muted-foreground">
+          {formatNumber(data.value)} ({data.percentage.toFixed(1)}%)
         </p>
-        <p className="text-sm text-muted-foreground">Cost: ${data.cost.toFixed(4)}</p>
-        <p className="text-sm text-muted-foreground">Requests: {data.requests}</p>
+        <p className="text-muted-foreground">${data.cost.toFixed(4)}</p>
       </div>
     );
   };
 
   const renderLabel = (entry: { percentage: number }) => {
-    return `${entry.percentage.toFixed(1)}%`;
+    return entry.percentage > 5 ? `${entry.percentage.toFixed(1)}%` : '';
   };
 
   return (
     <div className={cn('w-full', className)}>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={250}>
         <PieChart>
           <Pie
             data={chartData}
@@ -91,20 +90,17 @@ export function ModelBreakdownChart({ data, isLoading, className }: ModelBreakdo
             cy="50%"
             labelLine={false}
             label={renderLabel}
-            outerRadius={100}
-            fill="#8884d8"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={2}
             dataKey="value"
           >
             {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.fill} />
+              <Cell key={`cell-${index}`} fill={entry.fill} strokeWidth={1} />
             ))}
           </Pie>
           <Tooltip content={renderTooltip} />
-          <Legend
-            verticalAlign="bottom"
-            height={36}
-            formatter={(value) => <span className="text-sm">{value}</span>}
-          />
+          {/* Legend removed from here, moved to AnalyticsPage for better layout control */}
         </PieChart>
       </ResponsiveContainer>
     </div>
