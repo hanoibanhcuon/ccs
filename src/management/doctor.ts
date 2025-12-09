@@ -19,6 +19,8 @@ import {
   CLIPROXY_DEFAULT_PORT,
 } from '../cliproxy';
 import { getPortProcess, isCLIProxyProcess } from '../utils/port-utils';
+import { getEnvironmentDiagnostics } from './environment-diagnostics';
+import { checkAuthCodePorts } from './oauth-port-diagnostics';
 
 // Make ora optional (might not be available during npm install postinstall)
 // ora v9+ is an ES module, need to use .default for CommonJS
@@ -146,29 +148,39 @@ class Doctor {
     this.checkCcsDirectory();
     console.log('');
 
-    // Group 2: Configuration
+    // Group 2: Environment (NEW - OAuth readiness diagnostics)
+    console.log(header('ENVIRONMENT'));
+    this.checkEnvironment();
+    console.log('');
+
+    // Group 3: Configuration
     console.log(header('CONFIGURATION'));
     this.checkConfigFiles();
     this.checkClaudeSettings();
     console.log('');
 
-    // Group 3: Profiles & Delegation
+    // Group 4: Profiles & Delegation
     console.log(header('PROFILES & DELEGATION'));
     this.checkProfiles();
     this.checkInstances();
     this.checkDelegation();
     console.log('');
 
-    // Group 4: System Health
+    // Group 5: System Health
     console.log(header('SYSTEM HEALTH'));
     this.checkPermissions();
     this.checkCcsSymlinks();
     this.checkSettingsSymlinks();
     console.log('');
 
-    // Group 5: CLIProxy (OAuth profiles)
+    // Group 6: CLIProxy (OAuth profiles)
     console.log(header('CLIPROXY (OAUTH PROFILES)'));
     await this.checkCLIProxy();
+    console.log('');
+
+    // Group 7: OAuth Readiness (NEW - port availability)
+    console.log(header('OAUTH READINESS'));
+    await this.checkOAuthPorts();
     console.log('');
 
     this.showReport();
@@ -763,6 +775,117 @@ class Doctor {
         'Run: ccs sync',
         { status: 'WARN', info: 'Check failed' }
       );
+    }
+  }
+
+  /**
+   * Check 10.1: Environment detection (OAuth readiness)
+   * Helps diagnose Windows headless false positives
+   */
+  private checkEnvironment(): void {
+    const spinner = ora('Checking environment').start();
+    const diag = getEnvironmentDiagnostics();
+
+    // Determine overall environment health
+    let envStatus: 'OK' | 'WARN' = 'OK';
+    let envMessage = 'Browser available';
+
+    // Check for potential issues
+    if (diag.detectedHeadless) {
+      if (diag.platform === 'win32' && diag.ttyStatus === 'undefined') {
+        // Windows false positive - this is actually a warning
+        envStatus = 'WARN';
+        envMessage = 'Headless detected (may be false positive on Windows)';
+      } else if (diag.sshSession) {
+        envMessage = 'SSH session (headless mode)';
+      } else {
+        envMessage = 'Headless environment';
+      }
+    }
+
+    if (envStatus === 'WARN') {
+      spinner.warn();
+      console.log(`  ${warn('Environment'.padEnd(22))}  ${envMessage}`);
+    } else {
+      spinner.succeed();
+      console.log(`  ${ok('Environment'.padEnd(22))}  ${envMessage}`);
+    }
+
+    // Show key environment details
+    console.log(`  ${''.padEnd(24)}  Platform: ${diag.platformName}`);
+    if (diag.sshSession) {
+      console.log(`  ${''.padEnd(24)}  SSH: Yes (${diag.sshReason})`);
+    }
+    if (diag.ttyStatus === 'undefined') {
+      console.log(`  ${''.padEnd(24)}  TTY: undefined [!]`);
+    }
+    console.log(`  ${''.padEnd(24)}  Browser: ${diag.browserReason}`);
+
+    this.results.addCheck(
+      'Environment',
+      envStatus === 'OK' ? 'success' : 'warning',
+      envMessage,
+      envStatus === 'WARN' ? 'If browser opens correctly, this warning can be ignored' : undefined,
+      {
+        status: envStatus,
+        info: envMessage,
+      }
+    );
+  }
+
+  /**
+   * Check 10.2: OAuth callback ports availability
+   * Pre-flight check for OAuth authentication
+   */
+  private async checkOAuthPorts(): Promise<void> {
+    const spinner = ora('Checking OAuth callback ports').start();
+    const portDiagnostics = await checkAuthCodePorts();
+
+    // Count issues
+    const conflicts = portDiagnostics.filter((d) => d.status === 'occupied');
+
+    if (conflicts.length === 0) {
+      spinner.succeed();
+      console.log(`  ${ok('OAuth Ports'.padEnd(22))}  All callback ports available`);
+      this.results.addCheck('OAuth Ports', 'success', undefined, undefined, {
+        status: 'OK',
+        info: 'All callback ports available',
+      });
+    } else {
+      spinner.warn();
+      console.log(`  ${warn('OAuth Ports'.padEnd(22))}  ${conflicts.length} port conflict(s)`);
+      this.results.addCheck(
+        'OAuth Ports',
+        'warning',
+        `${conflicts.length} port conflict(s)`,
+        'Close conflicting applications before OAuth',
+        { status: 'WARN', info: `${conflicts.length} conflict(s)` }
+      );
+    }
+
+    // Show individual port status
+    for (const diag of portDiagnostics) {
+      const providerName = diag.provider.charAt(0).toUpperCase() + diag.provider.slice(1);
+      const portStr = diag.port !== null ? `(${diag.port})` : '';
+
+      let statusIcon: string;
+      switch (diag.status) {
+        case 'free':
+        case 'cliproxy':
+          statusIcon = ok(`${providerName} ${portStr}`.padEnd(20));
+          break;
+        case 'occupied':
+          statusIcon = warn(`${providerName} ${portStr}`.padEnd(20));
+          break;
+        default:
+          statusIcon = info(`${providerName} ${portStr}`.padEnd(20));
+      }
+
+      console.log(`  ${statusIcon}  ${diag.message}`);
+
+      if (diag.recommendation && diag.status === 'occupied') {
+        console.log(`  ${''.padEnd(24)}  Fix: ${diag.recommendation}`);
+      }
     }
   }
 

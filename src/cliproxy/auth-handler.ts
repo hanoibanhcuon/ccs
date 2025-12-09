@@ -22,11 +22,13 @@ import { CLIProxyProvider } from './types';
 import {
   AccountInfo,
   discoverExistingAccounts,
+  generateNickname,
   getDefaultAccount,
   getProviderAccounts,
   registerAccount,
   touchAccount,
 } from './account-manager';
+import { preflightOAuthCheck } from '../management/oauth-port-diagnostics';
 
 /**
  * OAuth callback ports used by CLIProxyAPI (hardcoded in binary)
@@ -90,26 +92,50 @@ function killProcessOnPort(port: number, verbose: boolean): boolean {
 
 /**
  * Detect if running in a headless environment (no browser available)
+ *
+ * IMPROVED: Avoids false positives on Windows desktop environments
+ * where isTTY may be undefined due to terminal wrapper behavior.
+ *
+ * Case study: Vietnamese Windows users reported "command hangs" because
+ * their terminal (PowerShell via npm) didn't set isTTY correctly.
  */
 function isHeadlessEnvironment(): boolean {
-  // SSH session
+  // SSH session - always headless
   if (process.env.SSH_TTY || process.env.SSH_CLIENT || process.env.SSH_CONNECTION) {
     return true;
   }
 
-  // No display (Linux/X11)
+  // No display on Linux (X11/Wayland) - headless
   if (process.platform === 'linux' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
     return true;
   }
 
-  // Non-interactive (piped stdin) - skip on Windows
-  // Windows npm wrappers don't set isTTY correctly (returns undefined, not true)
+  // Windows desktop - NEVER headless unless SSH (already checked above)
+  // This fixes false positive where Windows npm wrappers don't set isTTY correctly
   // Windows desktop environments always have browser capability
-  if (process.platform !== 'win32' && !process.stdin.isTTY) {
-    return true;
+  if (process.platform === 'win32') {
+    return false;
   }
 
-  return false;
+  // macOS - check for proper terminal
+  if (process.platform === 'darwin') {
+    // Non-interactive stdin on macOS means likely piped/scripted
+    if (!process.stdin.isTTY) {
+      return true;
+    }
+    return false;
+  }
+
+  // Linux with display - check TTY
+  if (process.platform === 'linux') {
+    if (!process.stdin.isTTY) {
+      return true;
+    }
+    return false;
+  }
+
+  // Default fallback for unknown platforms
+  return !process.stdin.isTTY;
 }
 
 /**
@@ -404,14 +430,15 @@ export function clearAuth(provider: CLIProxyProvider): boolean {
  * Auto-detects headless environment and uses --no-browser flag accordingly
  * @param provider - The CLIProxy provider to authenticate
  * @param options - OAuth options
+ * @param options.add - If true, skip confirm prompt when adding another account
  * @returns Account info if successful, null otherwise
  */
 export async function triggerOAuth(
   provider: CLIProxyProvider,
-  options: { verbose?: boolean; headless?: boolean; account?: string } = {}
+  options: { verbose?: boolean; headless?: boolean; account?: string; add?: boolean } = {}
 ): Promise<AccountInfo | null> {
   const oauthConfig = getOAuthConfig(provider);
-  const { verbose = false } = options;
+  const { verbose = false, add = false } = options;
 
   // Auto-detect headless if not explicitly set
   const headless = options.headless ?? isHeadlessEnvironment();
@@ -421,6 +448,47 @@ export async function triggerOAuth(
       console.error(`[auth] ${msg}`);
     }
   };
+
+  // Check for existing accounts and prompt if --add not specified
+  const existingAccounts = getProviderAccounts(provider);
+  if (existingAccounts.length > 0 && !add) {
+    console.log('');
+    console.log(
+      `[i] ${existingAccounts.length} account(s) already authenticated for ${oauthConfig.displayName}`
+    );
+
+    // Import readline for confirm prompt
+    const readline = await import('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      rl.question('[?] Add another account? (y/N): ', (answer) => {
+        rl.close();
+        resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+      });
+    });
+
+    if (!confirmed) {
+      console.log('[i] Cancelled');
+      return null;
+    }
+  }
+
+  // Pre-flight check: verify OAuth callback port is available
+  const preflight = await preflightOAuthCheck(provider);
+  if (!preflight.ready) {
+    console.log('');
+    console.log('[!] OAuth pre-flight check failed:');
+    for (const issue of preflight.issues) {
+      console.log(`    ${issue}`);
+    }
+    console.log('');
+    console.log('[i] Resolve the port conflict and try again.');
+    return null;
+  }
 
   // Ensure binary exists
   let binaryPath: string;
@@ -624,8 +692,8 @@ function registerAccountFromToken(
     const data = JSON.parse(content);
     const email = data.email || undefined;
 
-    // Register the account
-    return registerAccount(provider, newestFile, email);
+    // Register the account with auto-generated nickname
+    return registerAccount(provider, newestFile, email, generateNickname(email));
   } catch {
     return null;
   }

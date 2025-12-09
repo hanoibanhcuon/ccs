@@ -36,10 +36,11 @@ jobs:
           bun install --frozen-lockfile
           cd ui && bun install --frozen-lockfile
 
-      - name: Build and validate
-        run: |
-          bun run build:all
-          bun run validate
+      - name: Build
+        run: bun run build:all
+
+      - name: Validate (typecheck + lint + tests)
+        run: bun run validate
 
       - name: Bump dev version
         id: bump

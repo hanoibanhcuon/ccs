@@ -12,6 +12,9 @@
  */
 
 import { Router, Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import {
   loadDailyUsageData,
   loadMonthlyUsageData,
@@ -28,6 +31,169 @@ import {
   clearDiskCache,
   getCacheAge,
 } from './usage-disk-cache';
+
+// ============================================================================
+// Multi-Instance Support - Aggregate usage from CCS profiles
+// ============================================================================
+
+/** Path to CCS instances directory */
+const CCS_INSTANCES_DIR = path.join(os.homedir(), '.ccs', 'instances');
+
+/**
+ * Get list of CCS instance paths that have usage data
+ * Only returns instances with existing projects/ directory
+ */
+function getInstancePaths(): string[] {
+  if (!fs.existsSync(CCS_INSTANCES_DIR)) {
+    return [];
+  }
+
+  try {
+    const entries = fs.readdirSync(CCS_INSTANCES_DIR, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(CCS_INSTANCES_DIR, entry.name))
+      .filter((instancePath) => {
+        // Only include instances that have a projects directory
+        const projectsPath = path.join(instancePath, 'projects');
+        return fs.existsSync(projectsPath);
+      });
+  } catch {
+    console.error('[!] Failed to read CCS instances directory');
+    return [];
+  }
+}
+
+/**
+ * Load usage data from a specific instance by temporarily setting CLAUDE_CONFIG_DIR
+ * Returns empty arrays if instance has no usage data
+ */
+async function loadInstanceData(instancePath: string): Promise<{
+  daily: DailyUsage[];
+  monthly: MonthlyUsage[];
+  session: SessionUsage[];
+}> {
+  const originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
+
+  try {
+    // Set CLAUDE_CONFIG_DIR to instance path for better-ccusage to read from
+    process.env.CLAUDE_CONFIG_DIR = instancePath;
+
+    const [daily, monthly, session] = await Promise.all([
+      loadDailyUsageData() as Promise<DailyUsage[]>,
+      loadMonthlyUsageData() as Promise<MonthlyUsage[]>,
+      loadSessionData() as Promise<SessionUsage[]>,
+    ]);
+
+    return { daily, monthly, session };
+  } catch (_err) {
+    // Instance may have no usage data - that's OK
+    const instanceName = path.basename(instancePath);
+    console.log(`[i] No usage data in instance: ${instanceName}`);
+    return { daily: [], monthly: [], session: [] };
+  } finally {
+    // Restore original env var
+    if (originalConfigDir === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR;
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = originalConfigDir;
+    }
+  }
+}
+
+/**
+ * Merge daily usage data from multiple sources
+ * Combines entries with same date by aggregating tokens
+ */
+function mergeDailyData(sources: DailyUsage[][]): DailyUsage[] {
+  const dateMap = new Map<string, DailyUsage>();
+
+  for (const source of sources) {
+    for (const day of source) {
+      const existing = dateMap.get(day.date);
+      if (existing) {
+        // Aggregate tokens for same date
+        existing.inputTokens += day.inputTokens;
+        existing.outputTokens += day.outputTokens;
+        existing.cacheCreationTokens += day.cacheCreationTokens;
+        existing.cacheReadTokens += day.cacheReadTokens;
+        existing.totalCost += day.totalCost;
+        // Merge unique models
+        const modelSet = new Set([...existing.modelsUsed, ...day.modelsUsed]);
+        existing.modelsUsed = Array.from(modelSet);
+        // Merge model breakdowns by aggregating same modelName
+        for (const breakdown of day.modelBreakdowns) {
+          const existingBreakdown = existing.modelBreakdowns.find(
+            (b) => b.modelName === breakdown.modelName
+          );
+          if (existingBreakdown) {
+            existingBreakdown.inputTokens += breakdown.inputTokens;
+            existingBreakdown.outputTokens += breakdown.outputTokens;
+            existingBreakdown.cacheCreationTokens += breakdown.cacheCreationTokens;
+            existingBreakdown.cacheReadTokens += breakdown.cacheReadTokens;
+            existingBreakdown.cost += breakdown.cost;
+          } else {
+            existing.modelBreakdowns.push({ ...breakdown });
+          }
+        }
+      } else {
+        // Clone to avoid mutating original
+        dateMap.set(day.date, {
+          ...day,
+          modelsUsed: [...day.modelsUsed],
+          modelBreakdowns: day.modelBreakdowns.map((b) => ({ ...b })),
+        });
+      }
+    }
+  }
+
+  return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Merge monthly usage data from multiple sources
+ */
+function mergeMonthlyData(sources: MonthlyUsage[][]): MonthlyUsage[] {
+  const monthMap = new Map<string, MonthlyUsage>();
+
+  for (const source of sources) {
+    for (const month of source) {
+      const existing = monthMap.get(month.month);
+      if (existing) {
+        existing.inputTokens += month.inputTokens;
+        existing.outputTokens += month.outputTokens;
+        existing.cacheCreationTokens += month.cacheCreationTokens;
+        existing.cacheReadTokens += month.cacheReadTokens;
+        existing.totalCost += month.totalCost;
+        const modelSet = new Set([...existing.modelsUsed, ...month.modelsUsed]);
+        existing.modelsUsed = Array.from(modelSet);
+      } else {
+        monthMap.set(month.month, { ...month, modelsUsed: [...month.modelsUsed] });
+      }
+    }
+  }
+
+  return Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month));
+}
+
+/**
+ * Merge session data from multiple sources
+ * Deduplicates by sessionId (same session shouldn't appear in multiple instances)
+ */
+function mergeSessionData(sources: SessionUsage[][]): SessionUsage[] {
+  const sessionMap = new Map<string, SessionUsage>();
+
+  for (const source of sources) {
+    for (const session of source) {
+      // Use sessionId as unique key - later entries overwrite earlier ones
+      sessionMap.set(session.sessionId, session);
+    }
+  }
+
+  return Array.from(sessionMap.values()).sort(
+    (a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+  );
+}
 
 export const usageRoutes = Router();
 
@@ -195,17 +361,57 @@ let isRefreshing = false;
 
 /**
  * Load fresh data from better-ccusage and update both memory and disk caches
+ * Aggregates data from default ~/.claude/ AND all CCS instances
  */
 async function refreshFromSource(): Promise<{
   daily: DailyUsage[];
   monthly: MonthlyUsage[];
   session: SessionUsage[];
 }> {
-  const [daily, monthly, session] = await Promise.all([
+  // Load default data (from ~/.claude/ or current CLAUDE_CONFIG_DIR)
+  const defaultData = await Promise.all([
     loadDailyUsageData() as Promise<DailyUsage[]>,
     loadMonthlyUsageData() as Promise<MonthlyUsage[]>,
     loadSessionData() as Promise<SessionUsage[]>,
-  ]);
+  ]).then(([daily, monthly, session]) => ({ daily, monthly, session }));
+
+  // Load data from all CCS instances sequentially (to avoid env var race condition)
+  const instancePaths = getInstancePaths();
+  const instanceDataResults: Array<{
+    daily: DailyUsage[];
+    monthly: MonthlyUsage[];
+    session: SessionUsage[];
+  }> = [];
+
+  for (const instancePath of instancePaths) {
+    try {
+      const data = await loadInstanceData(instancePath);
+      instanceDataResults.push(data);
+    } catch (err) {
+      const instanceName = path.basename(instancePath);
+      console.error(`[!] Failed to load instance ${instanceName}:`, err);
+    }
+  }
+
+  // Collect successful instance data
+  const allDailySources: DailyUsage[][] = [defaultData.daily];
+  const allMonthlySources: MonthlyUsage[][] = [defaultData.monthly];
+  const allSessionSources: SessionUsage[][] = [defaultData.session];
+
+  for (const result of instanceDataResults) {
+    allDailySources.push(result.daily);
+    allMonthlySources.push(result.monthly);
+    allSessionSources.push(result.session);
+  }
+
+  if (instanceDataResults.length > 0) {
+    console.log(`[i] Aggregated usage data from ${instanceDataResults.length} CCS instance(s)`);
+  }
+
+  // Merge all data sources
+  const daily = mergeDailyData(allDailySources);
+  const monthly = mergeMonthlyData(allMonthlySources);
+  const session = mergeSessionData(allSessionSources);
 
   // Update in-memory cache
   const now = Date.now();

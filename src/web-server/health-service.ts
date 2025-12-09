@@ -2,7 +2,7 @@
  * Health Check Service (Phase 06)
  *
  * Runs comprehensive health checks for CCS dashboard matching `ccs doctor` output.
- * Groups: System, Configuration, Profiles & Delegation, System Health, CLIProxy
+ * Groups: System, Environment, Configuration, Profiles & Delegation, System Health, CLIProxy, OAuth Readiness
  */
 
 import * as fs from 'fs';
@@ -21,6 +21,8 @@ import {
 import { getClaudeCliInfo } from '../utils/claude-detector';
 import { getPortProcess, isCLIProxyProcess } from '../utils/port-utils';
 import packageJson from '../../package.json';
+import { getEnvironmentDiagnostics } from '../management/environment-diagnostics';
+import { checkAuthCodePorts } from '../management/oauth-port-diagnostics';
 
 export interface HealthCheck {
   id: string;
@@ -70,7 +72,12 @@ export async function runHealthChecks(): Promise<HealthReport> {
   systemChecks.push(checkCcsDirectory(ccsDir));
   groups.push({ id: 'system', name: 'System', icon: 'Monitor', checks: systemChecks });
 
-  // Group 2: Configuration
+  // Group 2: Environment (OAuth readiness diagnostics)
+  const envChecks: HealthCheck[] = [];
+  envChecks.push(checkEnvironment());
+  groups.push({ id: 'environment', name: 'Environment', icon: 'Laptop', checks: envChecks });
+
+  // Group 3: Configuration
   const configChecks: HealthCheck[] = [];
   configChecks.push(checkConfigFile());
   configChecks.push(...checkSettingsFiles(ccsDir));
@@ -82,7 +89,7 @@ export async function runHealthChecks(): Promise<HealthReport> {
     checks: configChecks,
   });
 
-  // Group 3: Profiles & Delegation
+  // Group 4: Profiles & Delegation
   const profileChecks: HealthCheck[] = [];
   profileChecks.push(checkProfiles(ccsDir));
   profileChecks.push(checkInstances(ccsDir));
@@ -94,7 +101,7 @@ export async function runHealthChecks(): Promise<HealthReport> {
     checks: profileChecks,
   });
 
-  // Group 4: System Health
+  // Group 5: System Health
   const healthChecks: HealthCheck[] = [];
   healthChecks.push(checkPermissions(ccsDir));
   healthChecks.push(checkCcsSymlinks());
@@ -106,7 +113,7 @@ export async function runHealthChecks(): Promise<HealthReport> {
     checks: healthChecks,
   });
 
-  // Group 5: CLIProxy
+  // Group 6: CLIProxy
   const cliproxyChecks: HealthCheck[] = [];
   cliproxyChecks.push(checkCliproxyBinary());
   cliproxyChecks.push(checkCliproxyConfig());
@@ -117,6 +124,16 @@ export async function runHealthChecks(): Promise<HealthReport> {
     name: 'CLIProxy (OAuth)',
     icon: 'Zap',
     checks: cliproxyChecks,
+  });
+
+  // Group 7: OAuth Readiness (port availability)
+  const oauthReadinessChecks: HealthCheck[] = [];
+  oauthReadinessChecks.push(...(await checkOAuthPortsForDashboard()));
+  groups.push({
+    id: 'oauth-readiness',
+    name: 'OAuth Readiness',
+    icon: 'Key',
+    checks: oauthReadinessChecks,
   });
 
   // Flatten all checks for backward compatibility
@@ -745,6 +762,58 @@ async function checkCliproxyPort(): Promise<HealthCheck> {
     details: `PID ${portProcess.pid}`,
     fix: `Kill process: kill ${portProcess.pid}`,
   };
+}
+
+// Check 16: Environment (platform, SSH, TTY, browser capability)
+function checkEnvironment(): HealthCheck {
+  const diag = getEnvironmentDiagnostics();
+
+  let status: 'ok' | 'warning' | 'info' = 'ok';
+  let message = 'Browser available';
+
+  if (diag.detectedHeadless) {
+    if (diag.platform === 'win32' && diag.ttyStatus === 'undefined') {
+      status = 'warning';
+      message = 'Possible headless false positive (Windows)';
+    } else if (diag.sshSession) {
+      status = 'info';
+      message = 'SSH session (headless mode)';
+    } else {
+      status = 'info';
+      message = 'Headless environment';
+    }
+  }
+
+  return {
+    id: 'environment',
+    name: 'Environment',
+    status,
+    message,
+    details: `${diag.platformName} | SSH: ${diag.sshSession ? 'Yes' : 'No'} | Browser: ${diag.browserReason}`,
+  };
+}
+
+// Check 17: OAuth Ports (port availability for Gemini, Codex, Agy)
+async function checkOAuthPortsForDashboard(): Promise<HealthCheck[]> {
+  const portDiagnostics = await checkAuthCodePorts();
+
+  return portDiagnostics.map((diag) => {
+    const providerName = diag.provider.charAt(0).toUpperCase() + diag.provider.slice(1);
+    const portStr = diag.port ? ` (${diag.port})` : '';
+
+    let status: 'ok' | 'warning' | 'info' = 'ok';
+    if (diag.status === 'occupied') status = 'warning';
+    if (diag.status === 'not_applicable') status = 'info';
+
+    return {
+      id: `oauth-port-${diag.provider}`,
+      name: `${providerName}${portStr}`,
+      status,
+      message: diag.message,
+      details: diag.process ? `PID ${diag.process.pid}` : undefined,
+      fix: diag.recommendation || undefined,
+    };
+  });
 }
 
 /**

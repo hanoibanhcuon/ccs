@@ -1,6 +1,6 @@
 {
   "name": "@kaitranntt/ccs",
-  "version": "5.12.1",
+  "version": "5.12.1-dev.4",
   "description": "Claude Code Switch - Instant profile switching between Claude Sonnet 4.5 and GLM 4.6",
   "keywords": [
     "cli",
@@ -62,9 +62,10 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
-    "validate": "bun run typecheck && bun run lint:fix && bun run format:check && bun run test",
+    "validate": "bun run typecheck && bun run lint:fix && bun run format:check && bun run test:all",
     "verify:bundle": "node scripts/verify-bundle.js",
     "test": "bun run build && bun run test:all",
+    "test:ci": "bun run test:all",
     "test:all": "bun test",
     "test:unit": "bun test tests/unit/",
     "test:npm": "bun test tests/npm/",
