@@ -43,6 +43,11 @@ export {
   getInstalledCliproxyVersion,
   installCliproxyVersion,
   fetchLatestCliproxyVersion,
+  getPinnedVersion,
+  savePinnedVersion,
+  clearPinnedVersion,
+  isVersionPinned,
+  getVersionPinPath,
 } from './binary-manager';
 
 // Config generation

@@ -11,7 +11,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { DailyUsage, MonthlyUsage, SessionUsage } from './usage-types';
+import type { DailyUsage, HourlyUsage, MonthlyUsage, SessionUsage } from './usage-types';
+import { ok, info, warn } from '../utils/ui';
 
 // Cache configuration
 const CCS_DIR = path.join(os.homedir(), '.ccs');
@@ -25,13 +26,14 @@ export interface UsageDiskCache {
   version: number;
   timestamp: number;
   daily: DailyUsage[];
+  hourly: HourlyUsage[];
   monthly: MonthlyUsage[];
   session: SessionUsage[];
 }
 
 // Current cache version - increment to invalidate old caches
-// v2: Updated model pricing (Opus 4.5: $5/$25, Gemini 3, GLM, Kimi, etc.)
-const CACHE_VERSION = 2;
+// v3: Added hourly data to cache
+const CACHE_VERSION = 3;
 
 /**
  * Ensure ~/.ccs/cache directory exists
@@ -58,7 +60,7 @@ export function readDiskCache(): UsageDiskCache | null {
 
     // Version check - invalidate if schema changed
     if (cache.version !== CACHE_VERSION) {
-      console.log('[i] Cache version mismatch, will refresh');
+      console.log(info('Cache version mismatch, will refresh'));
       return null;
     }
 
@@ -66,7 +68,7 @@ export function readDiskCache(): UsageDiskCache | null {
     return cache;
   } catch (err) {
     // Cache corrupted or unreadable - treat as miss
-    console.log('[i] Cache read failed, will refresh:', (err as Error).message);
+    console.log(info('Cache read failed, will refresh:') + ` ${(err as Error).message}`);
     return null;
   }
 }
@@ -94,6 +96,7 @@ export function isDiskCacheStale(cache: UsageDiskCache | null): boolean {
  */
 export function writeDiskCache(
   daily: DailyUsage[],
+  hourly: HourlyUsage[],
   monthly: MonthlyUsage[],
   session: SessionUsage[]
 ): void {
@@ -104,6 +107,7 @@ export function writeDiskCache(
       version: CACHE_VERSION,
       timestamp: Date.now(),
       daily,
+      hourly,
       monthly,
       session,
     };
@@ -113,10 +117,10 @@ export function writeDiskCache(
     fs.writeFileSync(tempFile, JSON.stringify(cache), 'utf-8');
     fs.renameSync(tempFile, CACHE_FILE);
 
-    console.log('[OK] Disk cache updated');
+    console.log(ok('Disk cache updated'));
   } catch (err) {
     // Non-fatal - we can still serve from memory
-    console.log('[!] Failed to write disk cache:', (err as Error).message);
+    console.log(warn('Failed to write disk cache:') + ` ${(err as Error).message}`);
   }
 }
 
@@ -143,9 +147,9 @@ export function clearDiskCache(): void {
   try {
     if (fs.existsSync(CACHE_FILE)) {
       fs.unlinkSync(CACHE_FILE);
-      console.log('[OK] Disk cache cleared');
+      console.log(ok('Disk cache cleared'));
     }
   } catch (err) {
-    console.log('[!] Failed to clear disk cache:', (err as Error).message);
+    console.log(warn('Failed to clear disk cache:') + ` ${(err as Error).message}`);
   }
 }

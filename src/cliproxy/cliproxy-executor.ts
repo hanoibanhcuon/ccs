@@ -15,6 +15,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as net from 'net';
 import { ProgressIndicator } from '../utils/progress-indicator';
+import { ok, fail, info, warn } from '../utils/ui';
 import { escapeShellArg } from '../utils/shell-executor';
 import { ensureCLIProxyBinary } from './binary-manager';
 import {
@@ -36,6 +37,8 @@ import {
   renameAccount,
   getDefaultAccount,
 } from './account-manager';
+import { getPortCheckCommand, getCatCommand, killProcessOnPort } from '../utils/platform-commands';
+import { getPortProcess, isCLIProxyProcess } from '../utils/port-utils';
 
 /** Default executor configuration */
 const DEFAULT_CONFIG: ExecutorConfig = {
@@ -152,7 +155,7 @@ export async function execClaudeWithCLIProxy(
   if (showAccounts) {
     const accounts = getProviderAccounts(provider);
     if (accounts.length === 0) {
-      console.log(`[i] No accounts registered for ${providerConfig.displayName}`);
+      console.log(info(`No accounts registered for ${providerConfig.displayName}`));
       console.log(`    Run "ccs ${provider} --auth" to add an account`);
     } else {
       console.log(`\n${providerConfig.displayName} Accounts:\n`);
@@ -170,7 +173,7 @@ export async function execClaudeWithCLIProxy(
   if (useAccount) {
     const account = findAccountByQuery(provider, useAccount);
     if (!account) {
-      console.error(`[X] Account not found: "${useAccount}"`);
+      console.error(fail(`Account not found: "${useAccount}"`));
       const accounts = getProviderAccounts(provider);
       if (accounts.length > 0) {
         console.error(`    Available accounts:`);
@@ -183,27 +186,27 @@ export async function execClaudeWithCLIProxy(
     // Set as default for this and future sessions
     setDefaultAccount(provider, account.id);
     touchAccount(provider, account.id);
-    console.log(`[OK] Switched to account: ${account.nickname || account.email || account.id}`);
+    console.log(ok(`Switched to account: ${account.nickname || account.email || account.id}`));
   }
 
   // Handle --nickname: rename account and exit (unless used with --auth --add)
   if (setNickname && !addAccount) {
     const defaultAccount = getDefaultAccount(provider);
     if (!defaultAccount) {
-      console.error(`[X] No account found for ${providerConfig.displayName}`);
+      console.error(fail(`No account found for ${providerConfig.displayName}`));
       console.error(`    Run "ccs ${provider} --auth" to add an account first`);
       process.exit(1);
     }
     try {
       const success = renameAccount(provider, defaultAccount.id, setNickname);
       if (success) {
-        console.log(`[OK] Renamed account to: ${setNickname}`);
+        console.log(ok(`Renamed account to: ${setNickname}`));
       } else {
-        console.error(`[X] Failed to rename account`);
+        console.error(fail('Failed to rename account'));
         process.exit(1);
       }
     } catch (err) {
-      console.error(`[X] ${err instanceof Error ? err.message : 'Failed to rename account'}`);
+      console.error(fail(err instanceof Error ? err.message : 'Failed to rename account'));
       process.exit(1);
     }
     process.exit(0);
@@ -220,9 +223,9 @@ export async function execClaudeWithCLIProxy(
   if (forceLogout) {
     const { clearAuth } = await import('./auth-handler');
     if (clearAuth(provider)) {
-      console.log(`[OK] Logged out from ${providerConfig.displayName}`);
+      console.log(ok(`Logged out from ${providerConfig.displayName}`));
     } else {
-      console.log(`[i] No authentication found for ${providerConfig.displayName}`);
+      console.log(info(`No authentication found for ${providerConfig.displayName}`));
     }
     process.exit(0);
   }
@@ -265,9 +268,7 @@ export async function execClaudeWithCLIProxy(
     const modelEntry = findModel(provider, currentModel);
     const issueUrl = getModelIssueUrl(provider, currentModel);
     console.error('');
-    console.error(
-      `[!] Warning: ${modelEntry?.name || currentModel} has known issues with Claude Code`
-    );
+    console.error(warn(`${modelEntry?.name || currentModel} has known issues with Claude Code`));
     console.error('    Tool calls will fail. Use "gemini-3-pro-preview" instead.');
     if (issueUrl) {
       console.error(`    Tracking: ${issueUrl}`);
@@ -284,7 +285,33 @@ export async function execClaudeWithCLIProxy(
   const configPath = generateConfig(provider, cfg.port);
   log(`Config written: ${configPath}`);
 
-  // 6. Spawn CLIProxyAPI binary
+  // 6a. Pre-flight check: ensure port is free (auto-kill zombie CLIProxy)
+  const portProcess = await getPortProcess(cfg.port);
+  if (portProcess) {
+    if (isCLIProxyProcess(portProcess)) {
+      // Zombie CLIProxy from previous run - auto-kill it
+      log(`Found zombie CLIProxy on port ${cfg.port} (PID ${portProcess.pid}), killing...`);
+      const killed = killProcessOnPort(cfg.port, verbose);
+      if (killed) {
+        console.log(info(`Cleaned up zombie CLIProxy process`));
+        // Wait a bit for port to be released
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    } else {
+      // Non-CLIProxy process blocking the port - warn user
+      console.error('');
+      console.error(
+        warn(`Port ${cfg.port} is blocked by ${portProcess.processName} (PID ${portProcess.pid})`)
+      );
+      console.error('');
+      console.error('To fix this, close the blocking application or run:');
+      console.error(`  ${getPortCheckCommand(cfg.port)}`);
+      console.error('');
+      throw new Error(`Port ${cfg.port} is in use by another application`);
+    }
+  }
+
+  // 6b. Spawn CLIProxyAPI binary
   const proxyArgs = ['--config', configPath];
 
   log(`Spawning: ${binaryPath} ${proxyArgs.join(' ')}`);
@@ -306,10 +333,10 @@ export async function execClaudeWithCLIProxy(
 
   // Handle proxy errors
   proxy.on('error', (error) => {
-    console.error(`[X] CLIProxy spawn error: ${error.message}`);
+    console.error(fail(`CLIProxy spawn error: ${error.message}`));
   });
 
-  // 5. Wait for proxy readiness via TCP polling
+  // 7. Wait for proxy readiness via TCP polling
   const readySpinner = new ProgressIndicator(`Waiting for CLIProxy on port ${cfg.port}`);
   readySpinner.start();
 
@@ -322,7 +349,7 @@ export async function execClaudeWithCLIProxy(
 
     const err = error as Error;
     console.error('');
-    console.error('[X] CLIProxy failed to start');
+    console.error(fail('CLIProxy failed to start'));
     console.error('');
     console.error('Possible causes:');
     console.error(`  1. Port ${cfg.port} already in use`);
@@ -330,9 +357,10 @@ export async function execClaudeWithCLIProxy(
     console.error('  3. Invalid configuration');
     console.error('');
     console.error('Troubleshooting:');
-    console.error(`  - Check if port ${cfg.port} is in use: lsof -i :${cfg.port}`);
+    console.error(`  - Check port: ${getPortCheckCommand(cfg.port)}`);
     console.error('  - Run with --verbose for detailed logs');
-    console.error(`  - Check config: cat ${configPath}`);
+    console.error(`  - View config: ${getCatCommand(configPath)}`);
+    console.error('  - Try: ccs doctor --fix');
     console.error('');
 
     throw new Error(`CLIProxy startup failed: ${err.message}`);
@@ -398,7 +426,7 @@ export async function execClaudeWithCLIProxy(
   });
 
   claude.on('error', (error) => {
-    console.error('[X] Claude CLI error:', error);
+    console.error(fail(`Claude CLI error: ${error}`));
     proxy.kill('SIGTERM');
     process.exit(1);
   });

@@ -20,9 +20,11 @@ import {
   loadMonthlyUsageData,
   loadSessionData,
   loadAllUsageData,
+  loadHourlyUsageData,
 } from './data-aggregator';
 import type {
   DailyUsage,
+  HourlyUsage,
   MonthlyUsage,
   SessionUsage,
   Anomaly,
@@ -38,6 +40,7 @@ import {
   clearDiskCache,
   getCacheAge,
 } from './usage-disk-cache';
+import { ok, info, fail } from '../utils/ui';
 
 // ============================================================================
 // Multi-Instance Support - Aggregate usage from CCS profiles
@@ -66,7 +69,7 @@ function getInstancePaths(): string[] {
         return fs.existsSync(projectsPath);
       });
   } catch {
-    console.error('[!] Failed to read CCS instances directory');
+    console.error(fail('Failed to read CCS instances directory'));
     return [];
   }
 }
@@ -77,6 +80,7 @@ function getInstancePaths(): string[] {
  */
 async function loadInstanceData(instancePath: string): Promise<{
   daily: DailyUsage[];
+  hourly: HourlyUsage[];
   monthly: MonthlyUsage[];
   session: SessionUsage[];
 }> {
@@ -87,8 +91,8 @@ async function loadInstanceData(instancePath: string): Promise<{
   } catch (_err) {
     // Instance may have no usage data - that's OK
     const instanceName = path.basename(instancePath);
-    console.log(`[i] No usage data in instance: ${instanceName}`);
-    return { daily: [], monthly: [], session: [] };
+    console.log(info(`No usage data in instance: ${instanceName}`));
+    return { daily: [], hourly: [], monthly: [], session: [] };
   }
 }
 
@@ -165,6 +169,52 @@ function mergeMonthlyData(sources: MonthlyUsage[][]): MonthlyUsage[] {
   }
 
   return Array.from(monthMap.values()).sort((a, b) => a.month.localeCompare(b.month));
+}
+
+/**
+ * Merge hourly usage data from multiple sources
+ * Combines entries with same hour by aggregating tokens
+ */
+function mergeHourlyData(sources: HourlyUsage[][]): HourlyUsage[] {
+  const hourMap = new Map<string, HourlyUsage>();
+
+  for (const source of sources) {
+    for (const hour of source) {
+      const existing = hourMap.get(hour.hour);
+      if (existing) {
+        existing.inputTokens += hour.inputTokens;
+        existing.outputTokens += hour.outputTokens;
+        existing.cacheCreationTokens += hour.cacheCreationTokens;
+        existing.cacheReadTokens += hour.cacheReadTokens;
+        existing.totalCost += hour.totalCost;
+        const modelSet = new Set([...existing.modelsUsed, ...hour.modelsUsed]);
+        existing.modelsUsed = Array.from(modelSet);
+        // Merge model breakdowns
+        for (const breakdown of hour.modelBreakdowns) {
+          const existingBreakdown = existing.modelBreakdowns.find(
+            (b) => b.modelName === breakdown.modelName
+          );
+          if (existingBreakdown) {
+            existingBreakdown.inputTokens += breakdown.inputTokens;
+            existingBreakdown.outputTokens += breakdown.outputTokens;
+            existingBreakdown.cacheCreationTokens += breakdown.cacheCreationTokens;
+            existingBreakdown.cacheReadTokens += breakdown.cacheReadTokens;
+            existingBreakdown.cost += breakdown.cost;
+          } else {
+            existing.modelBreakdowns.push({ ...breakdown });
+          }
+        }
+      } else {
+        hourMap.set(hour.hour, {
+          ...hour,
+          modelsUsed: [...hour.modelsUsed],
+          modelBreakdowns: hour.modelBreakdowns.map((b) => ({ ...b })),
+        });
+      }
+    }
+  }
+
+  return Array.from(hourMap.values()).sort((a, b) => a.hour.localeCompare(b.hour));
 }
 
 /**
@@ -245,12 +295,13 @@ let diskCacheInitialized = false;
  */
 function persistCacheIfComplete(): void {
   const daily = cache.get('daily') as CacheEntry<DailyUsage[]> | undefined;
+  const hourly = cache.get('hourly') as CacheEntry<HourlyUsage[]> | undefined;
   const monthly = cache.get('monthly') as CacheEntry<MonthlyUsage[]> | undefined;
   const session = cache.get('session') as CacheEntry<SessionUsage[]> | undefined;
 
   // Write if we have at least daily data (the most essential)
   if (daily) {
-    writeDiskCache(daily.data, monthly?.data ?? [], session?.data ?? []);
+    writeDiskCache(daily.data, hourly?.data ?? [], monthly?.data ?? [], session?.data ?? []);
   }
 }
 
@@ -283,7 +334,7 @@ async function getCachedData<T>(key: string, ttl: number, loader: () => Promise<
           persistCacheIfComplete();
         })
         .catch((err) => {
-          console.error(`[!] Background refresh failed for ${key}:`, err);
+          console.error(fail(`Background refresh failed for ${key}: ${err}`));
         })
         .finally(() => {
           pendingRequests.delete(key);
@@ -337,6 +388,13 @@ async function getCachedSessionData(): Promise<SessionUsage[]> {
   });
 }
 
+/** Cached loader for hourly usage data */
+async function getCachedHourlyData(): Promise<HourlyUsage[]> {
+  return getCachedData('hourly', CACHE_TTL.daily, async () => {
+    return await loadHourlyUsageData();
+  });
+}
+
 /**
  * Clear all cached data (useful for manual refresh)
  */
@@ -356,6 +414,7 @@ let isRefreshing = false;
  */
 async function refreshFromSource(): Promise<{
   daily: DailyUsage[];
+  hourly: HourlyUsage[];
   monthly: MonthlyUsage[];
   session: SessionUsage[];
 }> {
@@ -366,6 +425,7 @@ async function refreshFromSource(): Promise<{
   const instancePaths = getInstancePaths();
   const instanceDataResults: Array<{
     daily: DailyUsage[];
+    hourly: HourlyUsage[];
     monthly: MonthlyUsage[];
     session: SessionUsage[];
   }> = [];
@@ -376,41 +436,45 @@ async function refreshFromSource(): Promise<{
       instanceDataResults.push(data);
     } catch (err) {
       const instanceName = path.basename(instancePath);
-      console.error(`[!] Failed to load instance ${instanceName}:`, err);
+      console.error(fail(`Failed to load instance ${instanceName}: ${err}`));
     }
   }
 
   // Collect successful instance data
   const allDailySources: DailyUsage[][] = [defaultData.daily];
+  const allHourlySources: HourlyUsage[][] = [defaultData.hourly];
   const allMonthlySources: MonthlyUsage[][] = [defaultData.monthly];
   const allSessionSources: SessionUsage[][] = [defaultData.session];
 
   for (const result of instanceDataResults) {
     allDailySources.push(result.daily);
+    allHourlySources.push(result.hourly);
     allMonthlySources.push(result.monthly);
     allSessionSources.push(result.session);
   }
 
   if (instanceDataResults.length > 0) {
-    console.log(`[i] Aggregated usage data from ${instanceDataResults.length} CCS instance(s)`);
+    console.log(info(`Aggregated usage data from ${instanceDataResults.length} CCS instance(s)`));
   }
 
   // Merge all data sources
   const daily = mergeDailyData(allDailySources);
+  const hourly = mergeHourlyData(allHourlySources);
   const monthly = mergeMonthlyData(allMonthlySources);
   const session = mergeSessionData(allSessionSources);
 
   // Update in-memory cache
   const now = Date.now();
   cache.set('daily', { data: daily, timestamp: now });
+  cache.set('hourly', { data: hourly, timestamp: now });
   cache.set('monthly', { data: monthly, timestamp: now });
   cache.set('session', { data: session, timestamp: now });
   lastFetchTimestamp = now;
 
   // Persist to disk
-  writeDiskCache(daily, monthly, session);
+  writeDiskCache(daily, hourly, monthly, session);
 
-  return { daily, monthly, session };
+  return { daily, hourly, monthly, session };
 }
 
 // ============================================================================
@@ -432,6 +496,7 @@ function ensureDiskCacheLoaded(): void {
   // Load disk cache into memory (regardless of freshness)
   // SWR pattern in getCachedData() will handle background refresh
   cache.set('daily', { data: diskCache.daily, timestamp: diskCache.timestamp });
+  cache.set('hourly', { data: diskCache.hourly || [], timestamp: diskCache.timestamp });
   cache.set('monthly', { data: diskCache.monthly, timestamp: diskCache.timestamp });
   cache.set('session', { data: diskCache.session, timestamp: diskCache.timestamp });
   lastFetchTimestamp = diskCache.timestamp;
@@ -453,7 +518,7 @@ export async function prewarmUsageCache(): Promise<{
   source: string;
 }> {
   const start = Date.now();
-  console.log('[i] Pre-warming usage cache...');
+  console.log(info('Pre-warming usage cache...'));
 
   try {
     const diskCache = readDiskCache();
@@ -462,13 +527,14 @@ export async function prewarmUsageCache(): Promise<{
     if (diskCache && isDiskCacheFresh(diskCache)) {
       const now = Date.now();
       cache.set('daily', { data: diskCache.daily, timestamp: diskCache.timestamp });
+      cache.set('hourly', { data: diskCache.hourly || [], timestamp: diskCache.timestamp });
       cache.set('monthly', { data: diskCache.monthly, timestamp: diskCache.timestamp });
       cache.set('session', { data: diskCache.session, timestamp: diskCache.timestamp });
       lastFetchTimestamp = diskCache.timestamp;
 
       const elapsed = Date.now() - start;
       console.log(
-        `[OK] Usage cache ready from disk (${elapsed}ms, cached ${getCacheAge(diskCache)})`
+        ok(`Usage cache ready from disk (${elapsed}ms, cached ${getCacheAge(diskCache)})`)
       );
       return { timestamp: now, elapsed, source: 'disk-fresh' };
     }
@@ -477,21 +543,24 @@ export async function prewarmUsageCache(): Promise<{
     if (diskCache && isDiskCacheStale(diskCache)) {
       const now = Date.now();
       cache.set('daily', { data: diskCache.daily, timestamp: diskCache.timestamp });
+      cache.set('hourly', { data: diskCache.hourly || [], timestamp: diskCache.timestamp });
       cache.set('monthly', { data: diskCache.monthly, timestamp: diskCache.timestamp });
       cache.set('session', { data: diskCache.session, timestamp: diskCache.timestamp });
       lastFetchTimestamp = diskCache.timestamp;
 
       const elapsed = Date.now() - start;
       console.log(
-        `[OK] Usage cache ready from disk (${elapsed}ms, stale ${getCacheAge(diskCache)}, refreshing...)`
+        ok(
+          `Usage cache ready from disk (${elapsed}ms, stale ${getCacheAge(diskCache)}, refreshing...)`
+        )
       );
 
       // Background refresh
       if (!isRefreshing) {
         isRefreshing = true;
         refreshFromSource()
-          .then(() => console.log('[OK] Background refresh complete'))
-          .catch((err) => console.error('[!] Background refresh failed:', err))
+          .then(() => console.log(ok('Background refresh complete')))
+          .catch((err) => console.error(fail(`Background refresh failed: ${err}`)))
           .finally(() => {
             isRefreshing = false;
           });
@@ -501,14 +570,14 @@ export async function prewarmUsageCache(): Promise<{
     }
 
     // No usable disk cache - refresh from source (blocking for first startup only)
-    console.log('[i] No disk cache, loading from source...');
+    console.log(info('No disk cache, loading from source...'));
     await refreshFromSource();
 
     const elapsed = Date.now() - start;
-    console.log(`[OK] Usage cache ready (${elapsed}ms)`);
+    console.log(ok(`Usage cache ready (${elapsed}ms)`));
     return { timestamp: Date.now(), elapsed, source: 'fresh' };
   } catch (err) {
-    console.error('[!] Failed to prewarm usage cache:', err);
+    console.error(fail(`Failed to prewarm usage cache: ${err}`));
     throw err;
   }
 }
@@ -746,6 +815,55 @@ usageRoutes.get(
       });
     } catch (error) {
       errorResponse(res, error, 'Failed to fetch daily usage');
+    }
+  }
+);
+
+/**
+ * GET /api/usage/hourly
+ *
+ * Returns hourly usage trends for chart visualization.
+ * Query: ?since=YYYYMMDD&until=YYYYMMDD (defaults to last 24 hours)
+ */
+usageRoutes.get(
+  '/hourly',
+  async (req: Request<object, object, object, UsageQuery>, res: Response) => {
+    try {
+      const since = validateDate(req.query.since);
+      const until = validateDate(req.query.until);
+
+      const hourlyData = await getCachedHourlyData();
+
+      // Filter by date range
+      const filtered = hourlyData.filter((h) => {
+        // Extract date from hour format "YYYY-MM-DD HH:00"
+        const hourDate = h.hour.slice(0, 10).replace(/-/g, '');
+        if (since && hourDate < since) return false;
+        if (until && hourDate > until) return false;
+        return true;
+      });
+
+      // Transform for chart consumption
+      const trends = filtered.map((hour) => ({
+        hour: hour.hour,
+        tokens: hour.inputTokens + hour.outputTokens,
+        inputTokens: hour.inputTokens,
+        outputTokens: hour.outputTokens,
+        cacheTokens: hour.cacheCreationTokens + hour.cacheReadTokens,
+        cost: Math.round(hour.totalCost * 100) / 100,
+        modelsUsed: hour.modelsUsed.length,
+        requests: hour.modelBreakdowns.length,
+      }));
+
+      // Sort by hour ascending for chart display
+      trends.sort((a, b) => a.hour.localeCompare(b.hour));
+
+      res.json({
+        success: true,
+        data: trends,
+      });
+    } catch (error) {
+      errorResponse(res, error, 'Failed to fetch hourly usage');
     }
   }
 );

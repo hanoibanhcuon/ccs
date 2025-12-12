@@ -4,11 +4,9 @@
 
 ![CCS Logo](docs/assets/ccs-logo-medium.png)
 
-### One command, zero downtime, multiple accounts
-
-**Switch between multiple Claude accounts, GLM, and Kimi instantly.**<br>
-Stop hitting rate limits. Keep working continuously.<br>
-Features a modern React 19 dashboard with real-time updates.
+### Switch between multiple Claude accounts, GLM, Kimi, and OAuth-based models (Gemini, Codex, Antigravity) instantly.
+Stop hitting rate limits. Keep working continuously.
+Features a modern React 19 dashboard with real-time updates and unified configuration.
 
 [![License](https://img.shields.io/badge/license-MIT-C15F3C?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=for-the-badge)]()

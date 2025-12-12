@@ -74,8 +74,9 @@ ccs/
 
 4. **CLIProxy Integration** (`src/cliproxy/`)
    - OAuth-based provider integration
-   - Binary manager for cliproxy executables
+   - Binary manager for cliproxy executables, including the new **version pin feature** (see Recent Changes)
    - Auth handler for OAuth flows
+   - **Model Catalog**: Manages available models (Gemini, Codex, AGY, Qwen, Iflow)
 
 5. **AI Delegation** (`src/delegation/`)
    - Headless Claude execution
@@ -112,7 +113,7 @@ ccs/
 - Dark mode support
 
 **Key Pages**:
-- Dashboard: Overview and status
+- Dashboard: Overview, status, usage analytics, CLIProxy controls, and system health monitoring
 - API Profiles: Model configuration
 - CLIProxy: OAuth provider setup
 - Accounts: Account management
@@ -220,6 +221,23 @@ ccs/
 - **Quality gates**: Pre-commit validation
 - **Comprehensive tests**: Unit, integration, native
 
+## Recent Changes
+
+### Version Pin Feature (Issue #88)
+- **Description**: Users can now explicitly pin a specific version of CLIProxy using `ccs cliproxy --install <version>`. This creates a `.version-pin` file, preventing automatic updates and ensuring stability for specific project requirements.
+
+### Profile Persistence Fix (Issue #82)
+- **Description**: Relaxed configuration validation rules to prevent unintended data loss when handling user profiles, improving robustness and user experience.
+
+### UI Dashboard Capabilities
+- **Description**: The web-based UI now provides comprehensive dashboard functionalities, including usage analytics, CLIProxy controls, and system health monitoring, enhancing user visibility and control.
+
+### Multi-Provider Support
+- **Description**: The CLIProxy now supports multiple AI model providers, including Gemini, Codex, AGY, Qwen, and Iflow, offering greater flexibility and choice for users.
+
+### Unified Config System
+- **Description**: A consolidated configuration system ensures consistent management of settings, feature flags, and secrets across the CLI and its components.
+
 ## Architecture Patterns
 
 ### Modular Design
@@ -229,6 +247,7 @@ ccs/
 - **Error boundaries**: Graceful error handling
 
 ### Configuration Management
+- **Unified Config System**: Consolidated management of settings, feature flags, and secrets across the CLI and its components (see Recent Changes).
 - **Shared data**: Symlinks for commands, skills, agents
 - **Isolated state**: Profile-specific sessions, logs
 - **Auto-recovery**: Self-healing configurations

@@ -12,6 +12,7 @@ jobs:
 
     permissions:
       contents: write
+      issues: write
 
     steps:
       - name: Checkout
@@ -96,7 +97,60 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --tag dev
 
+      - name: Tag resolved issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new }}"
+
+          # Find commits since last dev release (look for version bump commits)
+          LAST_RELEASE_COMMIT=$(git log --oneline --grep="chore(release):" -n 2 | tail -1 | cut -d' ' -f1)
+
+          if [[ -n "$LAST_RELEASE_COMMIT" ]]; then
+            RANGE="${LAST_RELEASE_COMMIT}..HEAD"
+          else
+            RANGE="HEAD~20..HEAD"
+          fi
+
+          echo "Checking commits in range: $RANGE"
+
+          # Extract issue numbers from commits
+          ISSUES=$(git log $RANGE --pretty=format:"%s %b" | \
+            grep -oE "(Fixes|Closes|Resolves|Refs?) #[0-9]+" | \
+            grep -oE "#[0-9]+" | sort -u || true)
+
+          if [[ -z "$ISSUES" ]]; then
+            echo "No linked issues found in commits"
+            exit 0
+          fi
+
+          # Create labels if they don't exist
+          gh label create "released-dev" \
+            --color "1d76db" \
+            --description "Fix available in @dev npm channel" \
+            --repo ${{ github.repository }} 2>/dev/null || true
+
+          for ISSUE in $ISSUES; do
+            NUM=${ISSUE#\#}
+
+            # Skip if already tagged (avoid spam)
+            if gh issue view "$NUM" --repo "${{ github.repository }}" --json labels --jq '.labels[].name' | grep -q "released-dev"; then
+              echo "Issue #$NUM already has released-dev label, skipping"
+              continue
+            fi
+
+            echo "Tagging issue #$NUM as released-dev"
+
+            # Add comment
+            gh issue comment "$NUM" --repo "${{ github.repository }}" --body ":test_tube: Available in \`$NEW_VERSION\`. Install: \`npm i @kaitranntt/ccs@dev\`" || true
+
+            # Add released-dev label
+            gh issue edit "$NUM" --add-label "released-dev" --repo "${{ github.repository }}" || true
+          done
+
       - name: Commit version bump
+        env:
+          HUSKY: 0
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
