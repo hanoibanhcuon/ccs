@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-CCS (Claude Code Switch) is a TypeScript-based CLI tool that enables instant profile switching between Claude Sonnet 4.5, GLM 4.6, GLMT (GLM with Thinking), and Kimi for Coding models. The project features a modern React 19 web dashboard with real-time WebSocket integration, comprehensive TypeScript architecture, and cross-platform support. Current architecture includes:
+CCS (Claude Code Switch) is a TypeScript-based CLI tool that enables instant profile switching between Claude, GLM, Kimi, Gemini, Codex, and Antigravity (and any OAuth-based models) models. It features a version pin mechanism for precise model control and a unified configuration system for seamless management across all providers. The project features a modern React 19 web dashboard with real-time WebSocket integration, comprehensive TypeScript architecture, and cross-platform support. Current architecture includes:
 
 - **TypeScript Core**: 43 source files with 100% type coverage
 - **React 19 Dashboard**: Modern UI with Vite, shadcn/ui, and real-time features
@@ -13,13 +13,14 @@ CCS (Claude Code Switch) is a TypeScript-based CLI tool that enables instant pro
 ## Product Vision
 
 ### Mission Statement
-Provide developers with instant, zero-downtime switching between AI models, optimizing for cost, performance, and rate limit management while maintaining a seamless workflow experience.
+Provide developers with instant, zero-downtime switching between diverse AI models, ensuring precise version control, optimizing for cost, performance, and rate limit management while maintaining a seamless workflow experience.
 
 ### Core Value Proposition
-- **Instant Switching**: One command to change AI models without file editing
-- **Zero Downtime**: Never interrupt development workflow during model switches
-- **Cost Optimization**: Use the right model for each task automatically
-- **Developer Experience**: Maintain familiar Claude CLI interface with enhanced capabilities
+- **Instant Switching**: One command to change AI models and providers without file editing
+- **Zero Downtime**: Never interrupt development workflow during model or provider switches
+- **Version Pinning**: Lock to specific model versions for consistent behavior
+- **Cost Optimization**: Use the right model/provider for each task automatically
+- **Developer Experience**: Maintain familiar Claude CLI interface with enhanced capabilities and multi-provider support
 
 ## Product Development Requirements (PDR)
 
@@ -457,6 +458,7 @@ The CCS project demonstrates successful iterative evolution balancing simplifica
 - **Developer Experience**: Familiar Claude CLI interface with AI delegation
 - **Maintainability**: Modular design, clear responsibilities
 - **Performance**: Minimal overhead, direct CLI execution
+- **Unified Configuration**: Centralized management for all AI models and providers
 
 ### Breaking Changes (v3.x → v4.x)
 - **Zero Breaking Changes**: v4.x fully backward compatible with v3.x
