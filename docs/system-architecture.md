@@ -177,6 +177,12 @@ if (profileInfo.name === 'glmt') {
 **3. Components (`ui/src/components/`)**
 - **UI Components (`ui/`)**: shadcn/ui base components
 - **Custom Components**: Domain-specific UI elements
+- **Core Components (Phase 1)**:
+  - `ProfileCard`: Individual profile display with active/inactive states and action buttons
+  - `ProfileDeck`: Grid container for profile cards with loading and error states
+  - `CommandBuilder`: Interactive command construction tool with search/filter capabilities
+  - `ValueMetrics`: Performance metrics visualization with trend indicators
+  - `HubFooter`: Utility footer with version info and navigation links
 - **Charts**: Data visualization components
 - **Forms**: Profile and configuration forms
 
@@ -237,6 +243,76 @@ const { data: profiles } = useQuery({
 - Manual chunks for vendor libraries
 - Source maps for debugging
 - Assets optimization
+
+#### Phase 1 Component Architecture (2024-12-12)
+
+**Component Hierarchy**:
+```mermaid
+graph TD
+    App --> Dashboard
+    App --> Layout
+    Layout --> HubFooter
+
+    Dashboard --> ProfileDeck
+    Dashboard --> CommandBuilder
+    Dashboard --> ValueMetrics
+
+    ProfileDeck --> ProfileCard
+
+    subgraph "UI Foundation"
+        shadcn[shadcn/ui Components]
+        tailwind[Tailwind CSS]
+        lucide[Lucide Icons]
+    end
+
+    ProfileCard --> shadcn
+    CommandBuilder --> shadcn
+    ValueMetrics --> shadcn
+    HubFooter --> shadcn
+```
+
+**Component Interaction Patterns**:
+
+1. **Profile Management Flow**:
+   - `ProfileDeck` fetches profile data via `useProfiles` hook
+   - Transforms API response to include UI state (active, model, lastUsed)
+   - Renders `ProfileCard` components for each profile
+   - Handles loading, error, and empty states
+
+2. **Command Building Flow**:
+   - `CommandBuilder` maintains local search state
+   - Filters predefined command list based on user input
+   - Provides copy and run actions for selected commands
+   - Categories commands for better organization
+
+3. **Metrics Visualization**:
+   - `ValueMetrics` displays mock performance data
+   - Shows trend indicators with color coding
+   - Aggregates monthly summary statistics
+   - Responsive grid layout for different screen sizes
+
+4. **Navigation Structure**:
+   - `HubFooter` provides version information
+   - Links to internal sections (Logs, Settings)
+   - External link to GitHub repository
+   - Responsive text display based on screen size
+
+**Data Flow Architecture**:
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard
+    participant ProfileDeck
+    participant API as useProfiles Hook
+    participant ProfileCard
+
+    User->>Dashboard: Load dashboard
+    Dashboard->>ProfileDeck: Request profiles
+    ProfileDeck->>API: fetchProfiles()
+    API-->>ProfileDeck: Profile data
+    ProfileDeck->>ProfileCard: Render with props
+    ProfileCard-->>User: Display profile UI
+```
 
 ### 2. Configuration Manager (`bin/config-manager.js`)
 

@@ -658,6 +658,124 @@ describe('Button', () => {
 });
 ```
 
+### Component Interface Patterns (Phase 1)
+
+#### Standard Props Interface
+```typescript
+// Required props first, optional props last
+interface ComponentProps {
+  // Required data
+  data: DataType;
+  // Optional boolean flags
+  isLoading?: boolean;
+  disabled?: boolean;
+  // Optional handlers
+  onAction?: () => void;
+  onChange?: (value: string) => void;
+  // Optional styling
+  className?: string;
+  // Optional children
+  children?: React.ReactNode;
+}
+```
+
+#### Profile Component Pattern
+```typescript
+// Example from ProfileCard
+interface ProfileCardProps {
+  profile: {
+    name: string;
+    settingsPath: string;
+    configured: boolean;
+    isActive?: boolean;
+    lastUsed?: string;
+    model?: string;
+  };
+  onSwitch?: () => void;
+  onConfig?: () => void;
+  onTest?: () => void;
+}
+
+// Component implementation
+export function ProfileCard({ profile, onSwitch, onConfig, onTest }: ProfileCardProps) {
+  return (
+    <Card className={profile.isActive ? 'border-primary' : ''}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold">{profile.name}</h3>
+            {profile.isActive && (
+              <Badge variant="default" className="text-xs">
+                Active
+              </Badge>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSwitch}
+            disabled={profile.isActive}
+          >
+            {profile.isActive ? 'Active' : 'Switch'}
+          </Button>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+```
+
+#### Mock Data Handling Pattern
+```typescript
+// Phase 1: Mock data for development
+const mockProfiles = profiles.map((profile, index: number) => ({
+  ...profile,
+  configured: profile.configured ?? false,
+  isActive: index === 0, // First profile is active
+  lastUsed: index === 0 ? '2 hours ago' : index === 1 ? '1 day ago' : undefined,
+  model: index === 0 ? 'claude-3.5-sonnet' : index === 1 ? 'claude-3-haiku' : undefined,
+}));
+
+// Clearly mark mock data with TODO comments
+// TODO: Replace with real data from API
+const mockMetrics = [
+  {
+    title: 'API Cost Saved',
+    value: '$127.50',
+    change: 23,
+    // ...
+  }
+];
+```
+
+#### Loading and Error State Pattern
+```typescript
+// Example from ProfileDeck
+if (isLoading) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="space-y-3">
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+if (error) {
+  return <div className="text-destructive text-sm">Failed to load profiles: {error.message}</div>;
+}
+
+if (!profiles || profiles.length === 0) {
+  return (
+    <div className="text-muted-foreground text-center py-8">
+      No profiles configured. Create your first profile to get started.
+    </div>
+  );
+}
+```
+
 ## UI System Patterns (Phase 5, v4.5.0+)
 
 ### Central UI Module (src/utils/ui.ts)
