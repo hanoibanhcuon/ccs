@@ -2,7 +2,7 @@
 
 # CCS - Claude Code Switch
 
-![CCS Logo](https://docs.ccs.kaitran.ca/assets/ccs-logo-medium.png)
+![CCS Logo](assets/ccs-logo-medium.png)
 
 ### Manage multiple AI accounts from one dashboard.
 Run Claude, Gemini, GLM, and more - concurrently, without conflicts.
@@ -64,15 +64,15 @@ The dashboard provides visual management for all account types:
 
 **Analytics (Light/Dark Theme)**
 
-![Analytics Light](https://docs.ccs.kaitran.ca/assets/screenshots/analytics-light.png)
+![Analytics Light](assets/screenshots/analytics-light.png)
 
-![Analytics Dark](https://docs.ccs.kaitran.ca/assets/screenshots/analytics.png)
+![Analytics Dark](assets/screenshots/analytics.png)
 
 **API Profiles & OAuth Providers**
 
-![API Profiles](https://docs.ccs.kaitran.ca/assets/screenshots/api_profiles.png)
+![API Profiles](assets/screenshots/api_profiles.png)
 
-![CLIProxy](https://docs.ccs.kaitran.ca/assets/screenshots/cliproxy.png)
+![CLIProxy](assets/screenshots/cliproxy.png)
 
 <br>
 
