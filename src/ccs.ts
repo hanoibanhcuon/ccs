@@ -252,6 +252,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Special case: cleanup command
+  if (firstArg === 'cleanup' || firstArg === '--cleanup') {
+    const { handleCleanupCommand } = await import('./commands/cleanup-command');
+    await handleCleanupCommand(args.slice(1));
+    return;
+  }
+
   // Special case: migrate command
   if (firstArg === 'migrate' || firstArg === '--migrate') {
     const { handleMigrateCommand, printMigrateHelp } = await import('./commands/migrate-command');
@@ -390,8 +397,12 @@ async function main(): Promise<void> {
       // Ensure instance exists (lazy init if needed)
       const instancePath = instanceMgr.ensureInstance(profileInfo.name);
 
-      // Update last_used timestamp
-      registry.touchProfile(profileInfo.name);
+      // Update last_used timestamp (check unified config first, fallback to legacy)
+      if (registry.hasAccountUnified(profileInfo.name)) {
+        registry.touchAccountUnified(profileInfo.name);
+      } else {
+        registry.touchProfile(profileInfo.name);
+      }
 
       // Execute Claude with instance isolation
       const envVars: NodeJS.ProcessEnv = { CLAUDE_CONFIG_DIR: instancePath };
