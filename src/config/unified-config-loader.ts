@@ -325,6 +325,10 @@ export function getWebSearchConfig(): {
   provider: 'auto' | 'web-search-prime' | 'brave' | 'tavily';
   fallback: boolean;
   webSearchPrimeUrl?: string;
+  gemini: {
+    enabled: boolean;
+    timeout: number;
+  };
 } {
   const config = loadOrCreateUnifiedConfig();
   return {
@@ -332,5 +336,9 @@ export function getWebSearchConfig(): {
     provider: config.websearch?.provider ?? 'auto',
     fallback: config.websearch?.fallback ?? true,
     webSearchPrimeUrl: config.websearch?.webSearchPrimeUrl,
+    gemini: {
+      enabled: config.websearch?.gemini?.enabled ?? true,
+      timeout: config.websearch?.gemini?.timeout ?? 55,
+    },
   };
 }

@@ -163,9 +163,7 @@ export function SettingsPage() {
                 <Label htmlFor="provider" className="text-base">
                   Preferred Provider
                 </Label>
-                <p className="text-sm text-muted-foreground">
-                  Primary web search provider to use
-                </p>
+                <p className="text-sm text-muted-foreground">Primary web search provider to use</p>
               </div>
               <Select
                 value={config?.provider || 'auto'}
@@ -223,7 +221,7 @@ export function SettingsPage() {
                 <div>
                   <p className="font-medium">web-search-prime</p>
                   <p className="text-sm text-muted-foreground">
-                    Free, no API key required. Primary fallback option.
+                    Requires z.ai coding plan subscription. Primary fallback option.
                   </p>
                 </div>
               </div>

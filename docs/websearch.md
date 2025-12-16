@@ -15,7 +15,10 @@ Third-party profiles (OAuth and API-based) cannot use Anthropic's WebSearch beca
 - CLIProxyAPI only receives conversation messages
 - Tool execution never reaches the third-party backend
 
-CCS solves this by automatically configuring MCP (Model Context Protocol) web search servers.
+CCS solves this with a hybrid fallback approach:
+
+1. **Gemini CLI Transformer** (Primary) - Uses `gemini -p` with `google_web_search` tool
+2. **MCP Fallback Chain** (Secondary) - MCP-based web search servers
 
 ## Architecture
 
@@ -28,19 +31,54 @@ CCS solves this by automatically configuring MCP (Model Context Protocol) web se
 │       ├── Native Claude Account? → Anthropic WebSearch API   │
 │       │                            ($10/1000 searches)        │
 │       │                                                       │
-│       └── Third-party Profile? → MCP Fallback Chain          │
+│       └── Third-party Profile? → PreToolUse Hook             │
 │                                   │                           │
-│                                   ├── 1. web-search-prime     │
-│                                   ├── 2. Brave Search (free)  │
-│                                   └── 3. Tavily (paid)        │
+│                                   ├── 1. Gemini CLI           │
+│                                   │    (google_web_search)    │
+│                                   │    No API key needed!     │
+│                                   │                           │
+│                                   └── 2. MCP Fallback Chain   │
+│                                        ├── web-search-prime   │
+│                                        ├── Brave Search       │
+│                                        └── Tavily             │
 └──────────────────────────────────────────────────────────────┘
+```
+
+## Gemini CLI Integration (Primary)
+
+The **ultimate solution** for third-party WebSearch. Uses `gemini` CLI with OAuth authentication - **no API key needed!**
+
+### How It Works
+
+1. A PreToolUse hook intercepts WebSearch tool calls
+2. Executes `gemini -p` with explicit google_web_search instruction
+3. Returns search results directly to Claude via the hook's deny reason
+4. Claude receives full search results and continues the conversation
+
+### Requirements
+
+- `gemini` CLI installed and authenticated (`gemini auth login`)
+- OAuth authentication (no GEMINI_API_KEY needed)
+
+### Installation
+
+The Gemini CLI is typically installed via:
+```bash
+pip install google-generativeai
+# or
+pipx install google-generativeai
+```
+
+Then authenticate:
+```bash
+gemini auth login
 ```
 
 ## MCP Providers
 
 | Provider | Type | Cost | API Key Required | Notes |
 |----------|------|------|------------------|-------|
-| web-search-prime | HTTP MCP | Free | No | Primary, always available |
+| web-search-prime | HTTP MCP | z.ai subscription | No | Requires z.ai coding plan |
 | Brave Search | stdio MCP | Free tier | `BRAVE_API_KEY` | 15k queries/month |
 | Tavily | stdio MCP | Paid | `TAVILY_API_KEY` | AI-optimized search |
 
@@ -65,12 +103,28 @@ websearch:
   provider: auto                   # auto | web-search-prime | brave | tavily
   fallback: true                   # Enable fallback chain (default: true)
   webSearchPrimeUrl: "https://..."  # Optional: custom endpoint
+
+  # Gemini CLI configuration (new!)
+  gemini:
+    enabled: true                  # Use Gemini CLI for WebSearch (default: true)
+    timeout: 55                    # Timeout in seconds (default: 55)
 ```
+
+### Environment Variables
+
+The WebSearch hook also respects these environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CCS_WEBSEARCH_SKIP` | Skip WebSearch hook entirely | `0` |
+| `CCS_GEMINI_SKIP` | Skip Gemini CLI, use MCP only | `0` |
+| `CCS_GEMINI_TIMEOUT` | Gemini CLI timeout (seconds) | `55` |
+| `CCS_DEBUG` | Enable debug output | `0` |
 
 ### Provider Options
 
 - **auto** (default): Uses web-search-prime, adds Brave/Tavily if API keys available
-- **web-search-prime**: Free, no API key needed
+- **web-search-prime**: Requires z.ai coding plan subscription
 - **brave**: Requires `BRAVE_API_KEY` env var
 - **tavily**: Requires `TAVILY_API_KEY` env var
 
@@ -119,6 +173,13 @@ CCS writes MCP configuration to `~/.claude/.mcp.json`. Example:
 ```
 
 ## Troubleshooting
+
+### Gemini CLI Issues
+
+1. **Not installed**: Install with `pip install google-generativeai`
+2. **Not authenticated**: Run `gemini auth login`
+3. **Timeout**: Increase timeout in config or via `CCS_GEMINI_TIMEOUT=90`
+4. **Skip Gemini**: Set `CCS_GEMINI_SKIP=1` to use MCP fallback only
 
 ### WebSearch Not Working
 

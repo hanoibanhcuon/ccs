@@ -14,7 +14,7 @@ import { detectClaudeCli } from './utils/claude-detector';
 import { getSettingsPath } from './utils/config-manager';
 import { ErrorManager } from './utils/error-manager';
 import { execClaudeWithCLIProxy, CLIProxyProvider } from './cliproxy';
-import { ensureMcpWebSearch } from './utils/mcp-manager';
+import { ensureMcpWebSearch, installWebSearchHook } from './utils/mcp-manager';
 
 // Import extracted command handlers
 import { handleVersionCommand } from './commands/version-command';
@@ -382,6 +382,7 @@ async function main(): Promise<void> {
       // Settings-based profiles (glm, glmt, kimi) are third-party providers
       // WebSearch is server-side tool - third-party providers have no access
       ensureMcpWebSearch();
+      installWebSearchHook();
 
       // Check if this is GLMT profile (requires proxy)
       if (profileInfo.name === 'glmt') {

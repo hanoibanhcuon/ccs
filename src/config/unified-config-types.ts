@@ -113,6 +113,17 @@ export interface WebSearchConfig {
   fallback?: boolean;
   /** Custom URL for web-search-prime provider (optional, overrides default) */
   webSearchPrimeUrl?: string;
+  /**
+   * Gemini CLI configuration for WebSearch transformation.
+   * Uses `gemini -p` with google_web_search tool as primary method.
+   * No API key needed - uses OAuth authentication.
+   */
+  gemini?: {
+    /** Enable Gemini CLI for WebSearch (default: true) */
+    enabled?: boolean;
+    /** Timeout in seconds for Gemini CLI (default: 55) */
+    timeout?: number;
+  };
 }
 
 /**
@@ -175,6 +186,10 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
       enabled: true,
       provider: 'auto',
       fallback: true,
+      gemini: {
+        enabled: true,
+        timeout: 55,
+      },
     },
   };
 }
