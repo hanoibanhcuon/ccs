@@ -1,3 +1,43 @@
+# [6.0.0](https://github.com/kaitranntt/ccs/compare/v5.20.0...v6.0.0) (2025-12-17)
+
+
+### Bug Fixes
+
+* **config:** force shutdown immediately instead of waiting ([6d69379](https://github.com/kaitranntt/ccs/commit/6d69379ead87dbf89d8b4d257e5134f45afc2e27))
+* **dev-install:** prevent duplicate entries in bun global package.json ([13824b6](https://github.com/kaitranntt/ccs/commit/13824b61caa2905f267a2b0fdbeaeb1886352b46))
+* **websearch:** preserve opencode and grok in mergeWithDefaults ([110925e](https://github.com/kaitranntt/ccs/commit/110925e72e1a4a50dd641992c0b92429913b5309))
+* **websearch:** update config.yaml comments to match CLI implementation ([81e46bd](https://github.com/kaitranntt/ccs/commit/81e46bd0e12d1cae3755f556a8f8890f6d9c33ac))
+* **websearch:** update existing hook config when filename changes ([4959928](https://github.com/kaitranntt/ccs/commit/4959928a8e2152916f4639bf0824e25518001bf4))
+* **websearch:** use correct @vibe-kit/grok-cli package ([b6c1ae4](https://github.com/kaitranntt/ccs/commit/b6c1ae48bab13c4c60084bec2d1f854b80a685b8))
+
+
+### Features
+
+* **build:** add preinstall script to manage UI dependencies ([78fb459](https://github.com/kaitranntt/ccs/commit/78fb459d956308a5a965c87d0382151eb5f8bd89))
+* **cliproxy-stats:** Implement detailed stats fetching and integrate into UI ([3216a0e](https://github.com/kaitranntt/ccs/commit/3216a0e8478ba9224b1c8ea36582a5166c8c01e0))
+* **monitor:** Enhance auth monitor and account flow visualization ([994bd77](https://github.com/kaitranntt/ccs/commit/994bd7765acd735635d0c324acac1aea0bb8a165))
+* **ui:** add connection timeline and improve account flow layout ([27de6af](https://github.com/kaitranntt/ccs/commit/27de6af8aa5a5de72b2c34137cd1a5343e175bc9))
+* **ui:** add documentation button to header ([6e4ee80](https://github.com/kaitranntt/ccs/commit/6e4ee805da23ac8969f4161d27047b5b82a07abc))
+* **ui:** enhance light theme contrast and animations ([197848a](https://github.com/kaitranntt/ccs/commit/197848a71bbb26cbbd31ea5457ac917b82688d05))
+* **ui:** implement auth monitor components & pages ([b97c3bf](https://github.com/kaitranntt/ccs/commit/b97c3bfda4ad47787fbce53617a7ee5d5267c2bf))
+* **websearch:** add advanced configuration and custom MCP support ([cadd2e8](https://github.com/kaitranntt/ccs/commit/cadd2e824105d7beb0ccb04f554efda82470d29c))
+* **websearch:** add Grok CLI support and improve install guidance ([c0938e1](https://github.com/kaitranntt/ccs/commit/c0938e1c8286b0f9c262cc36472e3600a2b044bb))
+* **websearch:** add MCP fallback and Gemini CLI hook for third-party profiles ([fd99ebc](https://github.com/kaitranntt/ccs/commit/fd99ebca983970b5fa1d5d366b0af5d136f9433e))
+* **websearch:** add model config + improve hook UX ([14c53d5](https://github.com/kaitranntt/ccs/commit/14c53d575f5eda6e49861d23c9eb22bfa6bf7058))
+* **websearch:** add multi-tier MCP fallback for third-party profiles ([071ec04](https://github.com/kaitranntt/ccs/commit/071ec041ed7e2cfa21cadb7f55bfa93d9fe8cb1b))
+* **websearch:** add OpenCode CLI as third WebSearch provider ([482cda0](https://github.com/kaitranntt/ccs/commit/482cda0f8e61fa0bb63672db74b7e5efb1c3f1c8))
+* **websearch:** dynamic hook timeout from config + grok-code default ([d33fefd](https://github.com/kaitranntt/ccs/commit/d33fefd1336129572a03d983fae5c32bf5f4998f))
+* **websearch:** enhance Gemini CLI integration, package manager detection, and WebSearch status ([f7a1a40](https://github.com/kaitranntt/ccs/commit/f7a1a40b42a17e18a69c241614cf3f5853deace3))
+* **websearch:** implement fallback chain for CLI providers ([e6aa8ac](https://github.com/kaitranntt/ccs/commit/e6aa8ac453c70995307ea1fc5c819e0f891f1d61))
+* **websearch:** respect config provider settings and consolidate prompts ([e71cb62](https://github.com/kaitranntt/ccs/commit/e71cb6227cfb114ca1864eea5198854604d83c52))
+* **web:** update account manager and web routes ([127e0e6](https://github.com/kaitranntt/ccs/commit/127e0e60437f47cd445c1ce9ddf03415d51a06c7))
+
+
+### BREAKING CHANGES
+
+* **websearch:** Hook no longer falls back to all installed CLIs. It now
+strictly respects config.yaml settings.
+
 # [5.20.0](https://github.com/kaitranntt/ccs/compare/v5.19.2...v5.20.0) (2025-12-15)
 
 
