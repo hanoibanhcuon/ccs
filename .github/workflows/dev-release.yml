@@ -88,10 +88,6 @@ jobs:
           jq --arg v "$NEW_VERSION" '.version = $v' package.json > package.json.tmp
           mv package.json.tmp package.json
 
-          # Update installers
-          sed -i "s/^VERSION=.*/VERSION=\"$NEW_VERSION\"/" installers/install.sh
-          sed -i "s/^\$Version = .*/\$Version = \"$NEW_VERSION\"/" installers/install.ps1
-
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -154,6 +150,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add VERSION package.json installers/install.sh installers/install.ps1
+          git add VERSION package.json
           git commit -m "chore(release): ${{ steps.bump.outputs.new }} [skip ci]"
           git push origin dev
