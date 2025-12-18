@@ -117,7 +117,14 @@ async function saveCopilotRawSettings(data: {
   return res.json();
 }
 
-async function startCopilotAuth(): Promise<{ success: boolean; error?: string }> {
+export interface CopilotAuthResult {
+  success: boolean;
+  error?: string;
+  deviceCode?: string;
+  verificationUrl?: string;
+}
+
+async function startCopilotAuth(): Promise<CopilotAuthResult> {
   const res = await fetch(`${API_BASE}/copilot/auth/start`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to start auth');
   return res.json();
@@ -204,10 +211,8 @@ export function useCopilot() {
   const startAuthMutation = useMutation({
     mutationFn: startCopilotAuth,
     onSuccess: () => {
-      // Delay refetch to allow auth to complete
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['copilot-status'] });
-      }, 2000);
+      // Auth completed - immediately refetch status
+      queryClient.invalidateQueries({ queryKey: ['copilot-status'] });
     },
   });
 
@@ -264,7 +269,9 @@ export function useCopilot() {
     isSavingRawSettings: saveRawSettingsMutation.isPending,
 
     startAuth: startAuthMutation.mutate,
+    startAuthAsync: startAuthMutation.mutateAsync,
     isAuthenticating: startAuthMutation.isPending,
+    authResult: startAuthMutation.data,
 
     startDaemon: startDaemonMutation.mutate,
     isStartingDaemon: startDaemonMutation.isPending,
