@@ -1,3 +1,15 @@
+# [6.4.0](https://github.com/kaitranntt/ccs/compare/v6.3.1...v6.4.0) (2025-12-18)
+
+
+### Bug Fixes
+
+* **websearch:** detect Gemini CLI auth status before showing Ready ([98c21ef](https://github.com/kaitranntt/ccs/commit/98c21efb5a3b7a39b27fda958691837545235f2d))
+
+
+### Features
+
+* **cliproxy:** implement interactive project selection for OAuth flows ([a66abba](https://github.com/kaitranntt/ccs/commit/a66abba174eb77555b4443f3e930be30264da7e4))
+
 ## [6.3.1](https://github.com/kaitranntt/ccs/compare/v6.3.0...v6.3.1) (2025-12-18)
 
 
