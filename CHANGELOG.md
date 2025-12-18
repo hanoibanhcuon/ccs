@@ -1,3 +1,11 @@
+## [6.2.1](https://github.com/kaitranntt/ccs/compare/v6.2.0...v6.2.1) (2025-12-18)
+
+
+### Bug Fixes
+
+* **ui:** add error state handling to API Profiles page ([2e77646](https://github.com/kaitranntt/ccs/commit/2e77646d607676fee1297948878cd4ba1939c58f)), closes [#125](https://github.com/kaitranntt/ccs/issues/125)
+* **websearch:** pass through to native WebSearch for account profiles ([6bd1f42](https://github.com/kaitranntt/ccs/commit/6bd1f420d994e799125f338940689e969e524991))
+
 # [6.2.0](https://github.com/kaitranntt/ccs/compare/v6.1.0...v6.2.0) (2025-12-18)
 
 
