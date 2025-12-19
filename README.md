@@ -243,6 +243,7 @@ See [docs/websearch.md](./docs/websearch.md) for detailed configuration and trou
 | OAuth Providers | [docs.ccs.kaitran.ca/providers/oauth-providers](https://docs.ccs.kaitran.ca/providers/oauth-providers) |
 | Multi-Account Claude | [docs.ccs.kaitran.ca/providers/claude-accounts](https://docs.ccs.kaitran.ca/providers/claude-accounts) |
 | API Profiles | [docs.ccs.kaitran.ca/providers/api-profiles](https://docs.ccs.kaitran.ca/providers/api-profiles) |
+| Remote Proxy | [docs.ccs.kaitran.ca/features/remote-proxy](https://docs.ccs.kaitran.ca/features/remote-proxy) |
 | CLI Reference | [docs.ccs.kaitran.ca/reference/cli-commands](https://docs.ccs.kaitran.ca/reference/cli-commands) |
 | Architecture | [docs.ccs.kaitran.ca/reference/architecture](https://docs.ccs.kaitran.ca/reference/architecture) |
 | Troubleshooting | [docs.ccs.kaitran.ca/reference/troubleshooting](https://docs.ccs.kaitran.ca/reference/troubleshooting) |

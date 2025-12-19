@@ -123,7 +123,8 @@ export function ProxyStatusWidget() {
               size="sm"
               className={cn(
                 'h-7 text-xs gap-1 flex-1',
-                hasUpdate && 'bg-amber-600 hover:bg-amber-700 text-white'
+                hasUpdate &&
+                  'bg-sidebar-accent hover:bg-sidebar-accent/90 text-sidebar-accent-foreground'
               )}
               onClick={handleRestart}
               disabled={isActioning}

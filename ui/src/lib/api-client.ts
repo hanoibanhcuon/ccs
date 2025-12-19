@@ -154,6 +154,42 @@ export interface CreatePreset {
   haiku?: string;
 }
 
+/** Remote proxy status from health check */
+export interface RemoteProxyStatus {
+  reachable: boolean;
+  latencyMs?: number;
+  error?: string;
+  errorCode?: 'CONNECTION_REFUSED' | 'TIMEOUT' | 'AUTH_FAILED' | 'UNKNOWN';
+}
+
+/** Remote proxy configuration */
+export interface ProxyRemoteConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  protocol: 'http' | 'https';
+  auth_token: string;
+}
+
+/** Fallback configuration */
+export interface ProxyFallbackConfig {
+  enabled: boolean;
+  auto_start: boolean;
+}
+
+/** Local proxy configuration */
+export interface ProxyLocalConfig {
+  port: number;
+  auto_start: boolean;
+}
+
+/** CLIProxy server configuration */
+export interface CliproxyServerConfig {
+  remote: ProxyRemoteConfig;
+  fallback: ProxyFallbackConfig;
+  local: ProxyLocalConfig;
+}
+
 /** CLIProxy process status from session tracker */
 export interface ProxyProcessStatus {
   running: boolean;
@@ -351,6 +387,29 @@ export const api = {
     delete: (profile: string, name: string) =>
       request<{ success: boolean }>(`/settings/${profile}/presets/${encodeURIComponent(name)}`, {
         method: 'DELETE',
+      }),
+  },
+  /** CLIProxy server configuration API */
+  cliproxyServer: {
+    /** Get cliproxy server configuration */
+    get: () => request<CliproxyServerConfig>('/cliproxy-server'),
+    /** Update cliproxy server configuration */
+    update: (config: Partial<CliproxyServerConfig>) =>
+      request<CliproxyServerConfig>('/cliproxy-server', {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      }),
+    /** Test remote proxy connection */
+    test: (params: {
+      host: string;
+      port: number;
+      protocol: 'http' | 'https';
+      authToken?: string;
+      allowSelfSigned?: boolean;
+    }) =>
+      request<RemoteProxyStatus>('/cliproxy-server/test', {
+        method: 'POST',
+        body: JSON.stringify(params),
       }),
   },
 };

@@ -51,6 +51,10 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   const { usageRoutes } = await import('./usage-routes');
   app.use('/api/usage', usageRoutes);
 
+  // CLIProxy server settings routes (Phase 5)
+  const cliproxyServerRoutes = (await import('./routes/proxy-routes')).default;
+  app.use('/api/cliproxy-server', cliproxyServerRoutes);
+
   // Dev mode: use Vite middleware for HMR
   if (options.dev) {
     const { createServer: createViteServer } = await import('vite');
