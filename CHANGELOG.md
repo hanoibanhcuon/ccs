@@ -1,3 +1,9 @@
+## [6.7.0-dev.5](https://github.com/kaitranntt/ccs/compare/v6.7.0-dev.4...v6.7.0-dev.5) (2025-12-19)
+
+### Features
+
+* **cliproxy:** auto-apply default preset when adding first account ([4036c42](https://github.com/kaitranntt/ccs/commit/4036c42687c0e5124825998350431f17ce617442))
+
 ## [6.7.0-dev.4](https://github.com/kaitranntt/ccs/compare/v6.7.0-dev.3...v6.7.0-dev.4) (2025-12-19)
 
 ### Bug Fixes
