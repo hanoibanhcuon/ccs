@@ -1322,7 +1322,8 @@ function ProxyContent({
   const defaultLocal = { port: 8317, auto_start: true };
 
   // Helper to get default port based on protocol
-  const getDefaultPort = (protocol: 'http' | 'https') => (protocol === 'https' ? 443 : 80);
+  // HTTP defaults to 8317 (CLIProxyAPI default), HTTPS to 443 (standard SSL)
+  const getDefaultPort = (protocol: 'http' | 'https') => (protocol === 'https' ? 443 : 8317);
 
   // Sync local state with config (using refs to avoid lint warnings)
   const hostInput = config?.remote.host ?? '';
@@ -1650,42 +1651,44 @@ function ProxyContent({
             </div>
           </div>
 
-          {/* Local Proxy Settings */}
-          <div className="space-y-3">
-            <h3 className="text-base font-medium">Local Proxy</h3>
-            <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
-              {/* Port */}
-              <div className="space-y-1">
-                <label className="text-sm text-muted-foreground">Port</label>
-                <Input
-                  type="number"
-                  value={displayLocalPort}
-                  onChange={(e) => setEditedLocalPort(e.target.value)}
-                  onBlur={saveLocalPort}
-                  placeholder="8317"
-                  className="font-mono max-w-32"
-                  disabled={saving}
-                />
-              </div>
-
-              {/* Auto-start */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">Auto-start</p>
-                  <p className="text-xs text-muted-foreground">
-                    Start local proxy automatically when needed
-                  </p>
+          {/* Local Proxy Settings - Only show in Local mode */}
+          {!isRemoteMode && (
+            <div className="space-y-3">
+              <h3 className="text-base font-medium">Local Proxy</h3>
+              <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                {/* Port */}
+                <div className="space-y-1">
+                  <label className="text-sm text-muted-foreground">Port</label>
+                  <Input
+                    type="number"
+                    value={displayLocalPort}
+                    onChange={(e) => setEditedLocalPort(e.target.value)}
+                    onBlur={saveLocalPort}
+                    placeholder="8317"
+                    className="font-mono max-w-32"
+                    disabled={saving}
+                  />
                 </div>
-                <Switch
-                  checked={config?.local.auto_start ?? true}
-                  onCheckedChange={(checked) =>
-                    saveCliproxyServerConfig({ local: { ...localConfig, auto_start: checked } })
-                  }
-                  disabled={saving}
-                />
+
+                {/* Auto-start */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">Auto-start</p>
+                    <p className="text-xs text-muted-foreground">
+                      Start local proxy automatically when needed
+                    </p>
+                  </div>
+                  <Switch
+                    checked={config?.local.auto_start ?? true}
+                    onCheckedChange={(checked) =>
+                      saveCliproxyServerConfig({ local: { ...localConfig, auto_start: checked } })
+                    }
+                    disabled={saving}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </ScrollArea>
 

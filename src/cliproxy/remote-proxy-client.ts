@@ -48,9 +48,10 @@ const DEFAULT_TIMEOUT_MS = 2000;
 
 /**
  * Get default port for protocol
+ * HTTP defaults to 8317 (CLIProxyAPI default), HTTPS to 443 (standard SSL)
  */
 function getDefaultPort(protocol: 'http' | 'https'): number {
-  return protocol === 'https' ? 443 : 80;
+  return protocol === 'https' ? 443 : 8317;
 }
 
 /**
