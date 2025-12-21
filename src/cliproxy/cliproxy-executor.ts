@@ -547,12 +547,16 @@ export async function execClaudeWithCLIProxy(
       : undefined;
 
   const envVars = useRemoteProxy
-    ? getRemoteEnvVars(provider, {
-        host: proxyConfig.host ?? 'localhost',
-        port: proxyConfig.port,
-        protocol: proxyConfig.protocol,
-        authToken: proxyConfig.authToken,
-      })
+    ? getRemoteEnvVars(
+        provider,
+        {
+          host: proxyConfig.host ?? 'localhost',
+          port: proxyConfig.port,
+          protocol: proxyConfig.protocol,
+          authToken: proxyConfig.authToken,
+        },
+        cfg.customSettingsPath
+      )
     : getEffectiveEnvVars(provider, cfg.port, cfg.customSettingsPath, remoteRewriteConfig);
   const webSearchEnv = getWebSearchHookEnv();
   const env = {
