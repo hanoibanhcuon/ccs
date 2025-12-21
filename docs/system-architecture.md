@@ -1,6 +1,6 @@
 # CCS System Architecture
 
-Last Updated: 2025-12-19
+Last Updated: 2025-12-21
 
 High-level architecture documentation for the CCS (Claude Code Switch) system.
 
@@ -166,14 +166,14 @@ CCS is a CLI wrapper that enables seamless switching between multiple Claude acc
 +===========================================================================+
 
   +------------------+
-  |     pages/       |  Route-level components
+  |     pages/       |  Route-level components (modular directories)
   |------------------|
-  | analytics.tsx    |
+  | analytics/       |  8 files - usage charts, cost tracking
+  | settings/        |  20 files - lazy-loaded tab sections
   | api.tsx          |
   | cliproxy.tsx     |
   | copilot.tsx      |
   | health.tsx       |
-  | settings.tsx     |
   +------------------+
            |
            v
@@ -186,7 +186,7 @@ CCS is a CLI wrapper that enables seamless switching between multiple Claude acc
   | copilot/         |     +------------------+     | use-profiles     |
   | health/          |                             | use-websocket    |
   | layout/          |                             +------------------+
-  | monitoring/      |
+  | monitoring/      |  <-- auth-monitor/ (8 files), error-logs/ (6 files)
   | profiles/        |
   | setup/           |
   | shared/          |

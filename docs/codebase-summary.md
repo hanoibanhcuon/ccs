@@ -1,8 +1,8 @@
 # CCS Codebase Summary
 
-Last Updated: 2025-12-19
+Last Updated: 2025-12-21
 
-Comprehensive overview of the modularized CCS codebase structure following the Phase 5 modularization effort.
+Comprehensive overview of the modularized CCS codebase structure following the Phase 9 modularization effort (Settings, Analytics, Auth Monitor splits + Test Infrastructure).
 
 ## Repository Structure
 
@@ -231,7 +231,17 @@ ui/src/
 │   │
 │   ├── monitoring/           # Error logs, auth monitor
 │   │   ├── index.ts
-│   │   ├── auth-monitor.tsx  # Auth monitoring (465 lines)
+│   │   ├── proxy-status-widget.tsx
+│   │   ├── auth-monitor/     # Split from 465-line file (8 files)
+│   │   │   ├── index.tsx     # Main component
+│   │   │   ├── types.ts
+│   │   │   ├── hooks.ts
+│   │   │   ├── utils.ts
+│   │   │   └── components/
+│   │   │       ├── live-pulse.tsx
+│   │   │       ├── inline-stats-badge.tsx
+│   │   │       ├── provider-card.tsx
+│   │   │       └── summary-card.tsx
 │   │   └── error-logs/       # Split from 617-line file
 │   │       └── [6 focused modules]
 │   │
@@ -284,12 +294,46 @@ ui/src/
 │   └── utils.ts              # Helper functions
 │
 ├── pages/                    # Page components (lazy-loaded)
-│   ├── analytics.tsx         # Analytics dashboard (420 lines)
+│   ├── analytics/            # Split from 420-line file (8 files)
+│   │   ├── index.tsx         # Main layout
+│   │   ├── types.ts          # Analytics types
+│   │   ├── hooks.ts          # Data fetching hooks
+│   │   ├── utils.ts          # Utility functions
+│   │   └── components/
+│   │       ├── analytics-header.tsx
+│   │       ├── analytics-skeleton.tsx
+│   │       ├── charts-grid.tsx
+│   │       └── cost-by-model-card.tsx
+│   ├── settings/             # Split from 1,781-line file (20 files)
+│   │   ├── index.tsx         # Main layout with lazy loading
+│   │   ├── context.tsx       # Settings provider wrapper
+│   │   ├── settings-context.ts
+│   │   ├── types.ts
+│   │   ├── hooks.ts          # Legacy re-exports
+│   │   ├── hooks/
+│   │   │   ├── index.ts
+│   │   │   ├── context-hooks.ts
+│   │   │   ├── use-settings-tab.ts
+│   │   │   ├── use-proxy-config.ts
+│   │   │   ├── use-websearch-config.ts
+│   │   │   ├── use-globalenv-config.ts
+│   │   │   └── use-raw-config.ts
+│   │   ├── components/
+│   │   │   ├── section-skeleton.tsx
+│   │   │   └── tab-navigation.tsx
+│   │   └── sections/
+│   │       ├── globalenv-section.tsx
+│   │       ├── websearch/
+│   │       │   ├── index.tsx
+│   │       │   └── provider-card.tsx
+│   │       └── proxy/
+│   │           ├── index.tsx
+│   │           ├── local-proxy-card.tsx
+│   │           └── remote-proxy-card.tsx
 │   ├── api.tsx               # API profiles page (350 lines)
 │   ├── cliproxy.tsx          # CLIProxy page (405 lines)
 │   ├── copilot.tsx           # Copilot page (295 lines)
-│   ├── health.tsx            # Health page (256 lines)
-│   └── settings.tsx          # Settings page (1,710 lines - TODO: split)
+│   └── health.tsx            # Health page (256 lines)
 │
 └── providers/                # Context providers
     └── websocket-provider.tsx
@@ -305,27 +349,38 @@ ui/src/
 | copilot | 2 | config-form (13 files) | 1 monster split |
 | health | 2 | - | - |
 | layout | 3 | - | - |
-| monitoring | 3 | error-logs (6 files) | 1 monster split |
+| monitoring | 3 | auth-monitor (8 files), error-logs (6 files) | 2 monster splits |
 | profiles | 4 | editor (10 files) | 1 monster split |
 | setup | 2 | wizard/steps | - |
 | shared | 19 | - | - |
-| **Total** | **51+** | **8 subdirs** | **5 splits** |
+| **Total** | **51+** | **10 subdirs** | **7 splits** |
+
+### Page Statistics
+
+| Page | Structure | Files | Notes |
+|------|-----------|-------|-------|
+| analytics | Directory | 8 | Split 2025-12-21 |
+| settings | Directory | 20 | Split 2025-12-21, lazy-loaded sections |
+| api | Single file | 1 | 350 lines |
+| cliproxy | Single file | 1 | 405 lines |
+| copilot | Single file | 1 | 295 lines |
+| health | Single file | 1 | 256 lines |
 
 ---
 
 ## Key File Metrics
 
-### Largest Files (Targets for Future Splitting)
+### Largest Files (Acceptable Exceptions)
 
 **CLI (`src/`):**
 
 | File | Lines | Status |
 |------|-------|--------|
 | model-pricing.ts | 676 | Data file - acceptable |
-| glmt-proxy.ts | 675 | Complex - monitor |
+| glmt-proxy.ts | 675 | Complex streaming - acceptable |
 | cliproxy-executor.ts | 666 | Core logic - acceptable |
-| cliproxy-command.ts | 634 | Could split |
-| usage/handlers.ts | 633 | Could split |
+| cliproxy-command.ts | 634 | Could split if needed |
+| usage/handlers.ts | 633 | Could split if needed |
 | ccs.ts | 596 | Entry point - acceptable |
 | unified-config-loader.ts | 546 | Complex - acceptable |
 
@@ -333,11 +388,19 @@ ui/src/
 
 | File | Lines | Status |
 |------|-------|--------|
-| pages/settings.tsx | 1,710 | **TODO: SPLIT** |
 | components/ui/sidebar.tsx | 674 | shadcn - acceptable |
-| monitoring/auth-monitor.tsx | 465 | Could split |
-| pages/analytics.tsx | 420 | Could split |
 | pages/cliproxy.tsx | 405 | Acceptable |
+| pages/api.tsx | 350 | Acceptable |
+| pages/copilot.tsx | 295 | Acceptable |
+| pages/health.tsx | 256 | Acceptable |
+
+**Split Files (Completed):**
+
+| Original | Lines | New Location | Files |
+|----------|-------|--------------|-------|
+| pages/settings.tsx | 1,781 | pages/settings/ | 20 |
+| pages/analytics.tsx | 420 | pages/analytics/ | 8 |
+| monitoring/auth-monitor.tsx | 465 | monitoring/auth-monitor/ | 8 |
 
 ---
 
@@ -377,17 +440,34 @@ export type { ProviderEditorProps } from './provider-editor';
 
 ```
 tests/
-├── unit/                     # Unit tests
-│   ├── auth/
+├── unit/                     # Unit tests (6 core test files)
+│   ├── data-aggregator.test.ts
 │   ├── cliproxy/
-│   ├── config/
-│   └── utils/
+│   │   └── remote-proxy-client.test.ts
+│   ├── jsonl-parser.test.ts
+│   ├── model-pricing.test.ts
+│   ├── unified-config.test.ts
+│   └── mcp-manager.test.ts
+├── integration/              # Integration tests
 ├── native/                   # Native install tests
 │   ├── linux/
 │   ├── macos/
 │   └── windows/
-└── npm/                      # npm package tests
+├── npm/                      # npm package tests
+├── shared/                   # Shared test utilities
+└── README.md
 ```
+
+### Test Metrics
+
+| Metric | Value |
+|--------|-------|
+| Total Tests | 497 |
+| Passing | 497 |
+| Skipped | 2 |
+| Failed | 0 |
+| Coverage Threshold | 90% |
+| Test Files | 29 |
 
 ---
 

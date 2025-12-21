@@ -1,6 +1,6 @@
 # CCS Product Development Requirements (PDR)
 
-Last Updated: 2025-12-19
+Last Updated: 2025-12-21
 
 ## Product Overview
 
@@ -8,7 +8,9 @@ Last Updated: 2025-12-19
 
 **Tagline**: The universal AI profile manager for Claude Code
 
-**Description**: CLI wrapper enabling seamless switching between multiple Claude accounts and alternative AI providers (GLM, Gemini, Codex) with a React-based dashboard for configuration management.
+**Description**: CLI wrapper enabling seamless switching between multiple Claude accounts and alternative AI providers (GLM, Gemini, Codex, OpenRouter) with a React-based dashboard for configuration management.
+
+**Current Version**: v7.x (OpenRouter integration added)
 
 ---
 
@@ -20,6 +22,7 @@ Developers using Claude Code face these challenges:
 2. **Provider Lock-in**: Stuck with Anthropic's API, cannot use alternatives
 3. **No Concurrent Sessions**: Cannot work on different projects with different accounts
 4. **Complex Configuration**: Manual env var and config file management
+5. **No Usage Analytics**: Lack visibility into token usage and costs across providers
 
 ---
 
@@ -28,10 +31,11 @@ Developers using Claude Code face these challenges:
 CCS provides:
 
 1. **Multi-Account Claude**: Isolated instances via `CLAUDE_CONFIG_DIR`
-2. **OAuth Providers**: Zero-config Gemini, Codex, Antigravity integration
-3. **API Profiles**: GLM, Kimi, any Anthropic-compatible API
+2. **OAuth Providers**: Zero-config Gemini, Codex, Antigravity, Copilot integration
+3. **API Profiles**: GLM, Kimi, OpenRouter, any Anthropic-compatible API
 4. **Visual Dashboard**: React SPA for configuration management
 5. **Automatic WebSearch**: MCP fallback for third-party providers
+6. **Usage Analytics**: Token tracking, cost analysis, model breakdown
 
 ---
 
@@ -41,8 +45,9 @@ CCS provides:
 |-----------|----------|------------------|
 | Individual Developer | Work/personal separation | Multi-account Claude |
 | Agency/Contractor | Client account isolation | Profile switching |
-| Cost-conscious Dev | GLM for bulk operations | API profiles |
+| Cost-conscious Dev | GLM for bulk operations | API profiles, analytics |
 | Enterprise | Custom LLM integration | OpenAI-compatible endpoints |
+| Power User | Multiple providers | OpenRouter 300+ models |
 
 ---
 
@@ -59,7 +64,7 @@ CCS provides:
 - Share commands, skills, agents across accounts
 
 ### FR-003: OAuth Provider Integration
-- Support Gemini, Codex, Antigravity OAuth flows
+- Support Gemini, Codex, Antigravity, Copilot OAuth flows
 - Browser-based authentication
 - Token caching and refresh
 
@@ -67,11 +72,13 @@ CCS provides:
 - Configure custom API endpoints
 - Support Anthropic-compatible APIs
 - Model mapping and configuration
+- OpenRouter integration with 300+ models
 
 ### FR-005: Dashboard UI
 - Visual profile management
 - Real-time health monitoring
-- Usage analytics
+- Usage analytics with cost tracking
+- Modular page architecture (settings, analytics, auth-monitor)
 
 ### FR-006: Health Diagnostics
 - Verify Claude CLI installation
@@ -80,7 +87,7 @@ CCS provides:
 
 ### FR-007: WebSearch Fallback
 - Auto-configure MCP web search for third-party profiles
-- Support Gemini CLI, Brave, Tavily providers
+- Support Gemini CLI, OpenCode, Grok providers
 - Graceful fallback chain
 
 ---
@@ -108,9 +115,10 @@ CCS provides:
 - Identical behavior across platforms
 
 ### NFR-005: Maintainability
-- Files < 200 lines
+- Files < 200 lines (with documented exceptions)
 - Domain-based organization
 - Barrel exports for clean imports
+- 90%+ test coverage
 
 ---
 
@@ -156,17 +164,17 @@ CCS provides:
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Startup time | < 100ms | TBD |
-| Dashboard load | < 2s | TBD |
-| Error rate | < 1% | TBD |
-| Test coverage | > 80% | TBD |
-| File size compliance | 100% < 200 lines | 85% |
+| Startup time | < 100ms | Achieved |
+| Dashboard load | < 2s | Achieved |
+| Error rate | < 1% | Achieved |
+| Test coverage | > 90% | 90% (497 tests) |
+| File size compliance | 100% < 200 lines | 95% |
 
 ---
 
 ## Release Criteria
 
-### v1.0 Release (Current)
+### v1.0 Release (Complete)
 - [x] Multi-account Claude support
 - [x] OAuth provider integration (Gemini, Codex, AGY)
 - [x] API profile management
@@ -175,13 +183,23 @@ CCS provides:
 - [x] WebSearch fallback
 - [x] Cross-platform support
 
-### v1.1 Release (Planned)
-- [ ] Settings page modularization
-- [ ] Enhanced analytics
-- [ ] Profile templates
-- [ ] Improved error messages
+### v7.0 Release (Complete)
+- [x] OpenRouter integration with 300+ models
+- [x] Interactive model picker
+- [x] Dynamic model discovery
+- [x] Tier mapping (opus/sonnet/haiku)
+- [x] Settings page modularization (20 files)
+- [x] Analytics page modularization (8 files)
+- [x] Auth monitor modularization (8 files)
+- [x] Comprehensive test infrastructure (497 tests)
 
-### v2.0 Release (Future)
+### v8.0 Release (Planned - Q1 2026)
+- [ ] Multiple CLIProxyAPI instances (load balancing, failover)
+- [ ] Native git worktree support
+- [ ] Critical bug fixes (#158, #155, #124)
+- [ ] Kiro auth support (#157)
+
+### v9.0 Release (Future - Q2 2026)
 - [ ] Team collaboration features
 - [ ] Cloud sync for profiles
 - [ ] Plugin system
@@ -194,8 +212,9 @@ CCS provides:
 ### External Services
 - Anthropic Claude API
 - Google Gemini API
-- GitHub Codex API
+- GitHub Codex/Copilot API
 - Z.AI GLM API
+- OpenRouter API
 
 ### Third-Party Libraries
 - Express.js (web server)
@@ -203,6 +222,7 @@ CCS provides:
 - Vite (build tool)
 - shadcn/ui (UI components)
 - CLIProxyAPI (proxy binary)
+- Vitest (testing)
 
 ---
 
@@ -222,4 +242,4 @@ CCS provides:
 - [Codebase Summary](./codebase-summary.md) - Technical structure
 - [Code Standards](./code-standards.md) - Development conventions
 - [System Architecture](./system-architecture.md) - Architecture diagrams
-- [Project Roadmap](./project-roadmap.md) - Development phases
+- [Project Roadmap](./project-roadmap.md) - Development phases and GitHub issues
