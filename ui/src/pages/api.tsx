@@ -220,6 +220,7 @@ export function ApiPage() {
         <div className="flex-1 flex flex-col min-w-0">
           {selectedProfileData ? (
             <ProfileEditor
+              key={selectedProfileData.name}
               profileName={selectedProfileData.name}
               onDelete={() => setDeleteConfirm(selectedProfileData.name)}
               onHasChangesUpdate={setEditorHasChanges}
@@ -266,6 +267,7 @@ export function ApiPage() {
         confirmText="Discard & Switch"
         variant="destructive"
         onConfirm={() => {
+          setEditorHasChanges(false);
           setSelectedProfile(pendingSwitch);
           setPendingSwitch(null);
         }}
