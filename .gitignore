@@ -39,3 +39,6 @@ logs/
 
 # CI-generated files
 .dev-release-info.json
+
+# Test coverage
+ui/coverage/
