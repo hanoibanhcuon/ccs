@@ -34,7 +34,7 @@ try {
 }
 
 /**
- * Extract latest release from CHANGELOG.md
+ * Extract latest release from CHANGELOG.md (for production releases)
  */
 function extractLatestRelease() {
   const changelogPath = 'CHANGELOG.md';
@@ -90,6 +90,40 @@ function extractLatestRelease() {
   }
 
   return { version, date, sections };
+}
+
+/**
+ * Extract dev release info from .dev-release-info.json (for dev releases)
+ * Falls back to CHANGELOG.md if file not found
+ */
+function extractDevRelease() {
+  const devInfoPath = '.dev-release-info.json';
+
+  if (!fs.existsSync(devInfoPath)) {
+    console.log('[!] .dev-release-info.json not found, falling back to CHANGELOG.md');
+    return extractLatestRelease();
+  }
+
+  try {
+    const content = fs.readFileSync(devInfoPath, 'utf8');
+    const info = JSON.parse(content);
+
+    // Parse commit messages into a simple Changes section
+    const changes = info.notes
+      .split('\n')
+      .filter((line) => line.trim().startsWith('-'))
+      .map((line) => line.trim().substring(1).trim())
+      .filter((item) => item);
+
+    return {
+      version: info.version,
+      date: new Date().toISOString().split('T')[0],
+      sections: changes.length > 0 ? { Changes: changes } : {},
+    };
+  } catch (error) {
+    console.error('[!] Error reading .dev-release-info.json:', error.message);
+    return extractLatestRelease();
+  }
 }
 
 /**
@@ -203,7 +237,8 @@ function sendToDiscord(embed) {
 
 // Main
 try {
-  const release = extractLatestRelease();
+  const isDev = releaseType === 'dev';
+  const release = isDev ? extractDevRelease() : extractLatestRelease();
   console.log(`[i] Preparing ${releaseType} notification for v${release.version}`);
 
   const embed = createEmbed(release);

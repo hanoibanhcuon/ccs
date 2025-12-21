@@ -106,6 +106,16 @@ gh release create "v${VERSION}" \
 
 log_info "Created GitHub prerelease"
 
+# Save release info for Discord notification
+# This file is read by send-discord-release.cjs for dev releases
+cat > .dev-release-info.json << EOF
+{
+  "version": "${VERSION}",
+  "notes": $(echo "$NOTES" | jq -Rs .)
+}
+EOF
+log_info "Saved release info for Discord notification"
+
 # Output for GitHub Actions
 echo "version=${VERSION}" >> "${GITHUB_OUTPUT:-/dev/null}"
 echo "released=true" >> "${GITHUB_OUTPUT:-/dev/null}"
