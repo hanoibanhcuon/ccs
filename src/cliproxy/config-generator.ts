@@ -392,6 +392,48 @@ function getGlobalEnvVars(): Record<string, string> {
   return globalEnvConfig.env;
 }
 
+/** Remote proxy configuration for URL rewriting */
+interface RemoteProxyRewriteConfig {
+  host: string;
+  port?: number;
+  protocol: 'http' | 'https';
+  authToken?: string;
+}
+
+/**
+ * Rewrite localhost URLs to remote server URLs.
+ * Handles various localhost patterns: 127.0.0.1, localhost, 0.0.0.0
+ */
+function rewriteLocalhostUrls(
+  envVars: NodeJS.ProcessEnv,
+  provider: CLIProxyProvider,
+  remoteConfig: RemoteProxyRewriteConfig
+): NodeJS.ProcessEnv {
+  const result = { ...envVars };
+  const baseUrl = result.ANTHROPIC_BASE_URL;
+
+  if (!baseUrl) return result;
+
+  // Check if URL points to localhost (127.0.0.1, localhost, 0.0.0.0)
+  const localhostPattern = /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0)(:\d+)?/i;
+  if (!localhostPattern.test(baseUrl)) return result;
+
+  // Build remote URL with smart port handling
+  const defaultPort = remoteConfig.protocol === 'https' ? 443 : 80;
+  const effectivePort = remoteConfig.port ?? defaultPort;
+  const portSuffix = effectivePort === defaultPort ? '' : `:${effectivePort}`;
+  const remoteBaseUrl = `${remoteConfig.protocol}://${remoteConfig.host}${portSuffix}/api/provider/${provider}`;
+
+  result.ANTHROPIC_BASE_URL = remoteBaseUrl;
+
+  // Update auth token if provided
+  if (remoteConfig.authToken) {
+    result.ANTHROPIC_AUTH_TOKEN = remoteConfig.authToken;
+  }
+
+  return result;
+}
+
 /**
  * Get effective environment variables for provider
  *
@@ -402,14 +444,19 @@ function getGlobalEnvVars(): Record<string, string> {
  *
  * All results are merged with global_env vars (telemetry/reporting disables).
  * User takes full responsibility for custom settings.
+ *
+ * If remoteRewriteConfig is provided, localhost URLs are rewritten to remote server.
  */
 export function getEffectiveEnvVars(
   provider: CLIProxyProvider,
   port: number = CLIPROXY_DEFAULT_PORT,
-  customSettingsPath?: string
+  customSettingsPath?: string,
+  remoteRewriteConfig?: RemoteProxyRewriteConfig
 ): NodeJS.ProcessEnv {
   // Get global env vars (DISABLE_TELEMETRY, etc.)
   const globalEnv = getGlobalEnvVars();
+
+  let envVars: NodeJS.ProcessEnv;
 
   // Priority 1: Custom settings path (for user-defined variants)
   if (customSettingsPath) {
@@ -421,7 +468,12 @@ export function getEffectiveEnvVars(
 
         if (settings.env && typeof settings.env === 'object') {
           // Custom variant settings found - merge with global env
-          return { ...globalEnv, ...settings.env };
+          envVars = { ...globalEnv, ...settings.env };
+          // Apply remote rewrite if configured
+          if (remoteRewriteConfig) {
+            envVars = rewriteLocalhostUrls(envVars, provider, remoteRewriteConfig);
+          }
+          return envVars;
         }
       } catch {
         // Invalid JSON - fall through to provider defaults
@@ -443,7 +495,12 @@ export function getEffectiveEnvVars(
 
       if (settings.env && typeof settings.env === 'object') {
         // User override found - merge with global env
-        return { ...globalEnv, ...settings.env };
+        envVars = { ...globalEnv, ...settings.env };
+        // Apply remote rewrite if configured
+        if (remoteRewriteConfig) {
+          envVars = rewriteLocalhostUrls(envVars, provider, remoteRewriteConfig);
+        }
+        return envVars;
       }
     } catch {
       // Invalid JSON or structure - fall through to defaults
