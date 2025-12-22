@@ -150,9 +150,9 @@ Claude Code Profile & Model Switcher`.trim();
   // MAJOR SECTION 3: CLI Proxy (OAuth Providers)
   // ═══════════════════════════════════════════════════════════════════════════
   printMajorSection(
-    'CLI Proxy (OAuth Providers)',
+    'CLI Proxy Plus (OAuth Providers)',
     [
-      'Zero-config OAuth authentication via CLIProxyAPI',
+      'Zero-config OAuth authentication via CLIProxy Plus',
       'First run: Browser opens for authentication, then model selection',
       'Settings: ~/.ccs/{provider}.settings.json (created after auth)',
     ],
@@ -161,6 +161,8 @@ Claude Code Profile & Model Switcher`.trim();
       ['ccs codex', 'OpenAI Codex (gpt-5.1-codex-max)'],
       ['ccs agy', 'Antigravity (Claude/Gemini models)'],
       ['ccs qwen', 'Qwen Code (qwen3-coder)'],
+      ['ccs kiro', 'Kiro (AWS CodeWhisperer Claude models)'],
+      ['ccs copilot', 'GitHub Copilot (GPT/Claude/Gemini)'],
       ['', ''], // Spacer
       ['ccs <provider> --auth', 'Authenticate only'],
       ['ccs <provider> --auth --add', 'Add another account'],
@@ -234,10 +236,10 @@ Claude Code Profile & Model Switcher`.trim();
   ]);
 
   // CLI Proxy management
-  printSubSection('CLI Proxy Management', [
-    ['ccs cliproxy', 'Show CLIProxyAPI status and version'],
-    ['ccs cliproxy --help', 'Full CLIProxy management help'],
-    ['ccs cliproxy --install <ver>', 'Install specific version (e.g., 6.5.53)'],
+  printSubSection('CLI Proxy Plus Management', [
+    ['ccs cliproxy', 'Show CLIProxy Plus status and version'],
+    ['ccs cliproxy --help', 'Full CLIProxy Plus management help'],
+    ['ccs cliproxy --install <ver>', 'Install specific version (e.g., 6.6.6)'],
     ['ccs cliproxy --latest', 'Update to latest version'],
   ]);
 
