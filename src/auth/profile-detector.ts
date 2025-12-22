@@ -27,7 +27,7 @@ export const CLIPROXY_PROFILES = [
   'qwen',
   'iflow',
   'kiro',
-  'copilot',
+  'ghcp',
 ] as const;
 export type CLIProxyProfileName = (typeof CLIPROXY_PROFILES)[number];
 
