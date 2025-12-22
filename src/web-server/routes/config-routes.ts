@@ -24,12 +24,16 @@ const router = Router();
 /**
  * GET /api/config/format - Return current config format and migration status
  */
-router.get('/format', (_req: Request, res: Response) => {
-  res.json({
-    format: getConfigFormat(),
-    migrationNeeded: needsMigration(),
-    backups: getBackupDirectories(),
-  });
+router.get('/format', (_req: Request, res: Response): void => {
+  try {
+    res.json({
+      format: getConfigFormat(),
+      migrationNeeded: needsMigration(),
+      backups: getBackupDirectories(),
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
 });
 
 /**
@@ -89,25 +93,33 @@ router.put('/', (req: Request, res: Response): void => {
 /**
  * POST /api/config/migrate - Trigger migration from JSON to YAML
  */
-router.post('/migrate', async (req: Request, res: Response) => {
-  const dryRun = req.query.dryRun === 'true';
-  const result = await migrate(dryRun);
-  res.json(result);
+router.post('/migrate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const dryRun = req.query.dryRun === 'true';
+    const result = await migrate(dryRun);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
 });
 
 /**
  * POST /api/config/rollback - Rollback migration to JSON format
  */
 router.post('/rollback', async (req: Request, res: Response): Promise<void> => {
-  const { backupPath } = req.body;
+  try {
+    const { backupPath } = req.body;
 
-  if (!backupPath || typeof backupPath !== 'string') {
-    res.status(400).json({ error: 'Missing required field: backupPath' });
-    return;
+    if (!backupPath || typeof backupPath !== 'string') {
+      res.status(400).json({ error: 'Missing required field: backupPath' });
+      return;
+    }
+
+    const success = await rollback(backupPath);
+    res.json({ success });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
   }
-
-  const success = await rollback(backupPath);
-  res.json({ success });
 });
 
 export default router;

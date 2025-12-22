@@ -21,6 +21,8 @@ import {
   removeAccount as removeAccountFn,
   touchAccount,
 } from '../../cliproxy/account-manager';
+import { getProxyTarget } from '../../cliproxy/proxy-target-resolver';
+import { fetchRemoteAuthStatus } from '../../cliproxy/remote-auth-fetcher';
 import type { CLIProxyProvider } from '../../cliproxy/types';
 
 const router = Router();
@@ -32,57 +34,79 @@ const validProviders: CLIProxyProvider[] = ['gemini', 'codex', 'agy', 'qwen', 'i
  * GET /api/cliproxy/auth - Get auth status for built-in CLIProxy profiles
  * Also fetches CLIProxyAPI stats to update lastUsedAt for active providers
  */
-router.get('/', async (_req: Request, res: Response) => {
-  // Initialize accounts from existing tokens on first request
-  initializeAccounts();
+router.get('/', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    // Check if remote mode is enabled
+    const target = getProxyTarget();
+    if (target.isRemote) {
+      const authStatus = await fetchRemoteAuthStatus(target);
+      res.json({ authStatus, source: 'remote' });
+      return;
+    }
 
-  // Fetch CLIProxyAPI usage stats to determine active providers
-  const stats = await fetchCliproxyStats();
+    // Local mode: Initialize accounts from existing tokens on first request
+    initializeAccounts();
 
-  // Map CLIProxyAPI provider names to our internal provider names
-  const statsProviderMap: Record<string, CLIProxyProvider> = {
-    gemini: 'gemini',
-    antigravity: 'agy',
-    codex: 'codex',
-    qwen: 'qwen',
-    iflow: 'iflow',
-  };
+    // Fetch CLIProxyAPI usage stats to determine active providers
+    const stats = await fetchCliproxyStats();
 
-  // Update lastUsedAt for providers with recent activity
-  if (stats?.requestsByProvider) {
-    for (const [statsProvider, requestCount] of Object.entries(stats.requestsByProvider)) {
-      if (requestCount > 0) {
-        const provider = statsProviderMap[statsProvider.toLowerCase()];
-        if (provider) {
-          // Touch the default account for this provider (or all accounts)
-          const accounts = getProviderAccounts(provider);
-          for (const account of accounts) {
-            // Only touch if this is the default account (most likely being used)
-            if (account.isDefault) {
-              touchAccount(provider, account.id);
+    // Map CLIProxyAPI provider names to our internal provider names
+    const statsProviderMap: Record<string, CLIProxyProvider> = {
+      gemini: 'gemini',
+      antigravity: 'agy',
+      codex: 'codex',
+      qwen: 'qwen',
+      iflow: 'iflow',
+    };
+
+    // Update lastUsedAt for providers with recent activity
+    if (stats?.requestsByProvider) {
+      for (const [statsProvider, requestCount] of Object.entries(stats.requestsByProvider)) {
+        if (requestCount > 0) {
+          const provider = statsProviderMap[statsProvider.toLowerCase()];
+          if (provider) {
+            // Touch the default account for this provider (or all accounts)
+            const accounts = getProviderAccounts(provider);
+            for (const account of accounts) {
+              // Only touch if this is the default account (most likely being used)
+              if (account.isDefault) {
+                touchAccount(provider, account.id);
+              }
             }
           }
         }
       }
     }
+
+    const statuses = getAllAuthStatus();
+
+    const authStatus = statuses.map((status) => {
+      const oauthConfig = getOAuthConfig(status.provider);
+      return {
+        provider: status.provider,
+        displayName: oauthConfig.displayName,
+        authenticated: status.authenticated,
+        lastAuth: status.lastAuth?.toISOString() || null,
+        tokenFiles: status.tokenFiles.length,
+        accounts: status.accounts,
+        defaultAccount: status.defaultAccount,
+      };
+    });
+
+    res.json({ authStatus });
+  } catch (error) {
+    // Return appropriate error for remote vs local mode
+    const target = getProxyTarget();
+    if (target.isRemote) {
+      res.status(503).json({
+        error: (error as Error).message,
+        authStatus: [],
+        source: 'remote',
+      });
+    } else {
+      res.status(500).json({ error: (error as Error).message });
+    }
   }
-
-  const statuses = getAllAuthStatus();
-
-  const authStatus = statuses.map((status) => {
-    const oauthConfig = getOAuthConfig(status.provider);
-    return {
-      provider: status.provider,
-      displayName: oauthConfig.displayName,
-      authenticated: status.authenticated,
-      lastAuth: status.lastAuth?.toISOString() || null,
-      tokenFiles: status.tokenFiles.length,
-      accounts: status.accounts,
-      defaultAccount: status.defaultAccount,
-    };
-  });
-
-  res.json({ authStatus });
 });
 
 // ==================== Account Management ====================
@@ -90,12 +114,41 @@ router.get('/', async (_req: Request, res: Response) => {
 /**
  * GET /api/cliproxy/accounts - Get all accounts across all providers
  */
-router.get('/accounts', (_req: Request, res: Response) => {
-  // Initialize accounts from existing tokens
-  initializeAccounts();
+router.get('/accounts', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    // Check if remote mode is enabled
+    const target = getProxyTarget();
+    if (target.isRemote) {
+      const authStatus = await fetchRemoteAuthStatus(target);
+      // Transform RemoteAuthStatus[] to account summary format
+      const accounts = authStatus.flatMap((status) =>
+        status.accounts.map((acc) => ({
+          provider: status.provider,
+          ...acc,
+        }))
+      );
+      res.json({ accounts, source: 'remote' });
+      return;
+    }
 
-  const accounts = getAllAccountsSummary();
-  res.json({ accounts });
+    // Local mode: Initialize accounts from existing tokens
+    initializeAccounts();
+
+    const accounts = getAllAccountsSummary();
+    res.json({ accounts });
+  } catch (error) {
+    const target = getProxyTarget();
+    if (target.isRemote) {
+      res.status(503).json({
+        error: (error as Error).message,
+        accounts: [],
+        source: 'remote',
+      });
+    } else {
+      const message = error instanceof Error ? error.message : 'Failed to list accounts';
+      res.status(500).json({ error: message });
+    }
+  }
 });
 
 /**
@@ -110,14 +163,28 @@ router.get('/accounts/:provider', (req: Request, res: Response): void => {
     return;
   }
 
-  const accounts = getProviderAccounts(provider as CLIProxyProvider);
-  res.json({ provider, accounts });
+  try {
+    const accounts = getProviderAccounts(provider as CLIProxyProvider);
+    res.json({ provider, accounts });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get provider accounts';
+    res.status(500).json({ error: message });
+  }
 });
 
 /**
  * POST /api/cliproxy/accounts/:provider/default - Set default account for provider
  */
 router.post('/accounts/:provider/default', (req: Request, res: Response): void => {
+  // Check if remote mode is enabled - account management not available
+  const target = getProxyTarget();
+  if (target.isRemote) {
+    res.status(501).json({
+      error: 'Account management not available in remote mode',
+    });
+    return;
+  }
+
   const { provider } = req.params;
   const { accountId } = req.body;
 
@@ -132,12 +199,19 @@ router.post('/accounts/:provider/default', (req: Request, res: Response): void =
     return;
   }
 
-  const success = setDefaultAccountFn(provider as CLIProxyProvider, accountId);
+  try {
+    const success = setDefaultAccountFn(provider as CLIProxyProvider, accountId);
 
-  if (success) {
-    res.json({ provider, defaultAccount: accountId });
-  } else {
-    res.status(404).json({ error: 'Account not found' });
+    if (success) {
+      res.json({ provider, defaultAccount: accountId });
+    } else {
+      res
+        .status(404)
+        .json({ error: `Account '${accountId}' not found for provider '${provider}'` });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set default account';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -145,6 +219,15 @@ router.post('/accounts/:provider/default', (req: Request, res: Response): void =
  * DELETE /api/cliproxy/accounts/:provider/:accountId - Remove an account
  */
 router.delete('/accounts/:provider/:accountId', (req: Request, res: Response): void => {
+  // Check if remote mode is enabled - account management not available
+  const target = getProxyTarget();
+  if (target.isRemote) {
+    res.status(501).json({
+      error: 'Account management not available in remote mode',
+    });
+    return;
+  }
+
   const { provider, accountId } = req.params;
 
   // Validate provider
@@ -153,12 +236,19 @@ router.delete('/accounts/:provider/:accountId', (req: Request, res: Response): v
     return;
   }
 
-  const success = removeAccountFn(provider as CLIProxyProvider, accountId);
+  try {
+    const success = removeAccountFn(provider as CLIProxyProvider, accountId);
 
-  if (success) {
-    res.json({ provider, accountId, deleted: true });
-  } else {
-    res.status(404).json({ error: 'Account not found' });
+    if (success) {
+      res.json({ provider, accountId, deleted: true });
+    } else {
+      res
+        .status(404)
+        .json({ error: `Account '${accountId}' not found for provider '${provider}'` });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove account';
+    res.status(500).json({ error: message });
   }
 });
 

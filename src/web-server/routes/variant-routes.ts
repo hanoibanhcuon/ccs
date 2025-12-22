@@ -78,82 +78,90 @@ router.post('/', (req: Request, res: Response): void => {
  * PUT /api/cliproxy/:name - Update cliproxy variant
  */
 router.put('/:name', (req: Request, res: Response): void => {
-  const { name } = req.params;
-  const { provider, account, model } = req.body;
+  try {
+    const { name } = req.params;
+    const { provider, account, model } = req.body;
 
-  const config = readConfigSafe();
+    const config = readConfigSafe();
 
-  if (!config.cliproxy?.[name]) {
-    res.status(404).json({ error: 'Variant not found' });
-    return;
-  }
-
-  const variant = config.cliproxy[name];
-
-  // Update fields if provided
-  if (provider) {
-    variant.provider = provider;
-  }
-  if (account !== undefined) {
-    if (account) {
-      variant.account = account;
-    } else {
-      delete variant.account; // Remove account to use default
+    if (!config.cliproxy?.[name]) {
+      res.status(404).json({ error: 'Variant not found' });
+      return;
     }
-  }
 
-  // Update model in settings file if provided
-  if (model !== undefined) {
-    const settingsPath = path.join(getCcsDir(), `${name}.settings.json`);
-    if (fs.existsSync(settingsPath)) {
-      const settings = loadSettings(settingsPath);
-      if (model) {
-        settings.env = settings.env || {};
-        settings.env.ANTHROPIC_MODEL = model;
-      } else if (settings.env) {
-        delete settings.env.ANTHROPIC_MODEL;
+    const variant = config.cliproxy[name];
+
+    // Update fields if provided
+    if (provider) {
+      variant.provider = provider;
+    }
+    if (account !== undefined) {
+      if (account) {
+        variant.account = account;
+      } else {
+        delete variant.account; // Remove account to use default
       }
-      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
     }
+
+    // Update model in settings file if provided
+    if (model !== undefined) {
+      const settingsPath = path.join(getCcsDir(), `${name}.settings.json`);
+      if (fs.existsSync(settingsPath)) {
+        const settings = loadSettings(settingsPath);
+        if (model) {
+          settings.env = settings.env || {};
+          settings.env.ANTHROPIC_MODEL = model;
+        } else if (settings.env) {
+          delete settings.env.ANTHROPIC_MODEL;
+        }
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+      }
+    }
+
+    writeConfig(config);
+
+    res.json({
+      name,
+      provider: variant.provider,
+      account: variant.account || 'default',
+      settings: variant.settings,
+      updated: true,
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
   }
-
-  writeConfig(config);
-
-  res.json({
-    name,
-    provider: variant.provider,
-    account: variant.account || 'default',
-    settings: variant.settings,
-    updated: true,
-  });
 });
 
 /**
  * DELETE /api/cliproxy/:name - Delete cliproxy variant
  */
 router.delete('/:name', (req: Request, res: Response): void => {
-  const { name } = req.params;
+  try {
+    const { name } = req.params;
 
-  const config = readConfigSafe();
+    const config = readConfigSafe();
 
-  if (!config.cliproxy?.[name]) {
-    res.status(404).json({ error: 'Variant not found' });
-    return;
-  }
-
-  // Never delete settings files for reserved provider names (safety guard)
-  if (!isReservedName(name)) {
-    // Only delete settings file for non-reserved variant names
-    const settingsPath = path.join(getCcsDir(), `${name}.settings.json`);
-    if (fs.existsSync(settingsPath)) {
-      fs.unlinkSync(settingsPath);
+    if (!config.cliproxy?.[name]) {
+      res.status(404).json({ error: 'Variant not found' });
+      return;
     }
+
+    // Never delete settings files for reserved provider names (safety guard)
+    if (!isReservedName(name)) {
+      // Only delete settings file for non-reserved variant names
+      const settingsPath = path.join(getCcsDir(), `${name}.settings.json`);
+      if (fs.existsSync(settingsPath)) {
+        fs.unlinkSync(settingsPath);
+      }
+    }
+
+    delete config.cliproxy[name];
+    writeConfig(config);
+
+    res.json({ name, deleted: true });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
   }
-
-  delete config.cliproxy[name];
-  writeConfig(config);
-
-  res.json({ name, deleted: true });
 });
 
 export default router;

@@ -3,6 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import * as fs from 'fs';
 import * as path from 'path';
 import {
   fetchCliproxyStats,
@@ -11,7 +12,11 @@ import {
   fetchCliproxyErrorLogs,
   fetchCliproxyErrorLogContent,
 } from '../../cliproxy/stats-fetcher';
-import { getCliproxyWritablePath } from '../../cliproxy/config-generator';
+import {
+  getCliproxyWritablePath,
+  getConfigPath,
+  getAuthDir,
+} from '../../cliproxy/config-generator';
 import { getProxyStatus as getProxyProcessStatus, stopProxy } from '../../cliproxy/session-tracker';
 import { ensureCliproxyService } from '../../cliproxy/service-manager';
 import { checkCliproxyUpdate } from '../../cliproxy/binary-manager';
@@ -19,10 +24,9 @@ import { checkCliproxyUpdate } from '../../cliproxy/binary-manager';
 const router = Router();
 
 /**
- * GET /api/cliproxy/stats - Get CLIProxyAPI usage statistics
- * Returns: CliproxyStats or error if proxy not running
+ * Shared handler for stats/usage endpoint
  */
-router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
+const handleStatsRequest = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Check if proxy is running first
     const running = await isCliproxyRunning();
@@ -48,7 +52,18 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
-});
+};
+
+/**
+ * GET /api/cliproxy/stats - Get CLIProxyAPI usage statistics
+ * Returns: CliproxyStats or error if proxy not running
+ */
+router.get('/stats', handleStatsRequest);
+
+/**
+ * GET /api/cliproxy/usage - Alias for /stats (frontend compatibility)
+ */
+router.get('/usage', handleStatsRequest);
 
 /**
  * GET /api/cliproxy/status - Check CLIProxyAPI running status
@@ -244,6 +259,172 @@ router.get('/error-logs/:name', async (req: Request, res: Response): Promise<voi
     }
 
     res.type('text/plain').send(content);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ==================== Config File ====================
+
+/**
+ * GET /api/cliproxy/config.yaml - Get CLIProxy YAML config content
+ * Returns: plain text YAML content
+ */
+router.get('/config.yaml', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const configPath = getConfigPath();
+    if (!fs.existsSync(configPath)) {
+      res.status(404).json({ error: 'Config file not found' });
+      return;
+    }
+
+    const content = fs.readFileSync(configPath, 'utf8');
+    res.type('text/yaml').send(content);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * PUT /api/cliproxy/config.yaml - Save CLIProxy YAML config content
+ * Body: { content: string }
+ * Returns: { success: true, path: string }
+ */
+router.put('/config.yaml', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { content } = req.body;
+
+    if (typeof content !== 'string') {
+      res.status(400).json({ error: 'Missing required field: content' });
+      return;
+    }
+
+    const configPath = getConfigPath();
+
+    // Ensure parent directory exists
+    const configDir = path.dirname(configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+
+    // Write atomically
+    const tempPath = configPath + '.tmp';
+    fs.writeFileSync(tempPath, content);
+    fs.renameSync(tempPath, configPath);
+
+    res.json({ success: true, path: configPath });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ==================== Auth Files ====================
+
+/**
+ * GET /api/cliproxy/auth-files - List auth files in auth directory
+ * Returns: { files: Array<{ name, size, mtime }> }
+ */
+router.get('/auth-files', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const authDir = getAuthDir();
+
+    if (!fs.existsSync(authDir)) {
+      res.json({ files: [] });
+      return;
+    }
+
+    const entries = fs.readdirSync(authDir, { withFileTypes: true });
+    const files = entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => {
+        const filePath = path.join(authDir, entry.name);
+        const stat = fs.statSync(filePath);
+        return {
+          name: entry.name,
+          size: stat.size,
+          mtime: stat.mtime.getTime(),
+        };
+      });
+
+    res.json({ files, directory: authDir });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/cliproxy/auth-files/download - Download auth file content
+ * Query: ?name=filename
+ * Returns: file content as octet-stream
+ */
+router.get('/auth-files/download', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name } = req.query;
+
+    if (!name || typeof name !== 'string') {
+      res.status(400).json({ error: 'Missing required query parameter: name' });
+      return;
+    }
+
+    // Validate filename - prevent path traversal
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      res.status(400).json({ error: 'Invalid filename' });
+      return;
+    }
+
+    const authDir = getAuthDir();
+    const filePath = path.join(authDir, name);
+
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'Auth file not found' });
+      return;
+    }
+
+    const content = fs.readFileSync(filePath);
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    res.type('application/octet-stream').send(content);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ==================== Model Updates ====================
+
+/**
+ * PUT /api/cliproxy/models/:provider - Update model for a provider
+ * Body: { model: string }
+ * Returns: { success: true, provider, model }
+ */
+router.put('/models/:provider', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { provider } = req.params;
+    const { model } = req.body;
+
+    if (!model || typeof model !== 'string') {
+      res.status(400).json({ error: 'Missing required field: model' });
+      return;
+    }
+
+    // Get the settings file for this provider
+    const ccsDir = getCliproxyWritablePath();
+    const settingsPath = path.join(ccsDir, `${provider}.settings.json`);
+
+    if (!fs.existsSync(settingsPath)) {
+      res.status(404).json({ error: `Settings file not found for provider: ${provider}` });
+      return;
+    }
+
+    // Read and update settings
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    settings.env = settings.env || {};
+    settings.env.ANTHROPIC_MODEL = model;
+
+    // Write atomically
+    const tempPath = settingsPath + '.tmp';
+    fs.writeFileSync(tempPath, JSON.stringify(settings, null, 2) + '\n');
+    fs.renameSync(tempPath, settingsPath);
+
+    res.json({ success: true, provider, model });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
