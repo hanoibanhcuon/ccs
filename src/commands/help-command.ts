@@ -264,7 +264,7 @@ Claude Code Profile & Model Switcher`.trim();
 
   // CLI Proxy paths
   console.log(subheader('CLI Proxy:'));
-  console.log(`  Binary:      ${color('~/.ccs/cliproxy/bin/cli-proxy-api', 'path')}`);
+  console.log(`  Binary:      ${color('~/.ccs/cliproxy/bin/cli-proxy-api-plus', 'path')}`);
   console.log(`  Config:      ${color('~/.ccs/cliproxy/config.yaml', 'path')}`);
   console.log(`  Auth:        ${color('~/.ccs/cliproxy/auth/', 'path')}`);
   console.log(`  ${dim('Port: 8317 (default)')}`);

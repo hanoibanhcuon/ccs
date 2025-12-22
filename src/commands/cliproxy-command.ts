@@ -102,7 +102,7 @@ function formatModelOption(model: ModelEntry): string {
 async function handleCreate(args: string[]): Promise<void> {
   await initUI();
   const parsedArgs = parseProfileArgs(args);
-  console.log(header('Create CLIProxy Variant'));
+  console.log(header('Create CLIProxy Plus Variant'));
   console.log('');
 
   // Step 1: Profile name
@@ -241,7 +241,7 @@ async function handleCreate(args: string[]): Promise<void> {
 
   // Create variant
   console.log('');
-  console.log(info('Creating CLIProxy variant...'));
+  console.log(info('Creating CLIProxy Plus variant...'));
   const result = createVariant(name, provider, model, account);
 
   if (!result.success) {

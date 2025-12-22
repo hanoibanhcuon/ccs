@@ -110,7 +110,7 @@ export async function installCliproxyVersion(version: string, verbose = false): 
   const manager = new BinaryManager({ version, verbose, forceVersion: true });
   if (manager.isBinaryInstalled()) {
     if (verbose)
-      console.log(info(`Removing existing CLIProxyAPI v${getInstalledCliproxyVersion()}`));
+      console.log(info(`Removing existing CLIProxy Plus v${getInstalledCliproxyVersion()}`));
     manager.deleteBinary();
   }
   await manager.ensureBinary();
