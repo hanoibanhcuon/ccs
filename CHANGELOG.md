@@ -1,3 +1,13 @@
+## [7.5.1](https://github.com/kaitranntt/ccs/compare/v7.5.0...v7.5.1) (2025-12-23)
+
+### Bug Fixes
+
+* **ui:** use UI color system for consistent CLI indicators ([91cd9ff](https://github.com/kaitranntt/ccs/commit/91cd9ffc16e46737d190b3858340e7c745021ef4))
+
+### Code Refactoring
+
+* **cliproxy:** enhance binary downloader with robust error handling ([c2dd026](https://github.com/kaitranntt/ccs/commit/c2dd0261b7c2a8e4b9bd11b04df16ed3ba6e93be))
+
 ## [7.5.0](https://github.com/kaitranntt/ccs/compare/v7.4.0...v7.5.0) (2025-12-22)
 
 ### Features
