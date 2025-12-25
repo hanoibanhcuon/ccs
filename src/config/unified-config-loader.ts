@@ -131,6 +131,8 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
         request_log:
           partial.cliproxy?.logging?.request_log ?? defaults.cliproxy.logging?.request_log ?? false,
       },
+      // Auth config - preserve user values, no defaults (uses constants as fallback)
+      auth: partial.cliproxy?.auth,
     },
     preferences: {
       ...defaults.preferences,
