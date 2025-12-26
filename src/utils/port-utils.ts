@@ -38,7 +38,7 @@ export async function getPortProcess(port: number): Promise<PortProcess | null> 
  */
 async function getPortProcessUnix(port: number): Promise<PortProcess | null> {
   try {
-    const { stdout } = await execAsync(`lsof -i :${port} -sTCP:LISTEN -t -F pcn`, {
+    const { stdout } = await execAsync(`lsof -i :${port} -sTCP:LISTEN -F pcn`, {
       timeout: 3000,
     });
 
@@ -117,7 +117,7 @@ export function isCLIProxyProcess(process: PortProcess | null): boolean {
     return false;
   }
 
-  // Match cli-proxy, cli-proxy.exe, cliproxy, cliproxy.exe, cli-proxy-api
+  // Match various CLIProxy binary names
   const name = process.processName.toLowerCase();
   return [
     'cli-proxy',
@@ -126,6 +126,10 @@ export function isCLIProxyProcess(process: PortProcess | null): boolean {
     'cliproxy.exe',
     'cli-proxy-api',
     'cli-proxy-api.exe',
+    'cliproxyapi',
+    'cliproxyapi.exe',
+    'cli-proxy-api-plus',
+    'cli-proxy-api-plus.exe',
   ].includes(name);
 }
 
