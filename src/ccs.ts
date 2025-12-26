@@ -412,6 +412,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Special case: tokens command (auth token management)
+  if (firstArg === 'tokens') {
+    const { handleTokensCommand } = await import('./commands/tokens-command');
+    const exitCode = await handleTokensCommand(args.slice(1));
+    process.exit(exitCode);
+  }
+
   // Special case: setup command (first-time wizard)
   if (firstArg === 'setup' || firstArg === '--setup') {
     const { handleSetupCommand } = await import('./commands/setup-command');
