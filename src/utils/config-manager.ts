@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Config, isConfig, Settings, isSettings } from '../types';
+import { Config, isConfig, Settings, isSettings, CLIProxyVariantsConfig } from '../types';
 import { expandPath, error } from './helpers';
 import { info } from './ui';
 import { isUnifiedMode, loadOrCreateUnifiedConfig } from '../config/unified-config-loader';
@@ -83,6 +83,63 @@ export function readConfig(): Config {
 }
 
 /**
+ * Load config safely with unified mode support.
+ * Returns Config with profiles from unified config.yaml or legacy config.json.
+ * Throws on error (catchable) instead of process.exit.
+ * Use this in web server routes where try/catch is needed.
+ */
+export function loadConfigSafe(): Config {
+  // Unified mode: extract profiles from config.yaml
+  if (isUnifiedMode()) {
+    const unifiedConfig = loadOrCreateUnifiedConfig();
+
+    // Convert unified profiles to legacy format for compatibility
+    const profiles: Record<string, string> = {};
+    for (const [name, profile] of Object.entries(unifiedConfig.profiles)) {
+      if (profile.settings) {
+        profiles[name] = profile.settings;
+      }
+    }
+
+    // Convert unified cliproxy variants to legacy format
+    let cliproxy: CLIProxyVariantsConfig | undefined;
+    if (unifiedConfig.cliproxy?.variants) {
+      cliproxy = {};
+      for (const [name, variant] of Object.entries(unifiedConfig.cliproxy.variants)) {
+        cliproxy[name] = {
+          // Cast provider - unified has more providers than legacy type
+          provider: variant.provider as 'gemini' | 'codex' | 'agy' | 'qwen',
+          settings: variant.settings || '',
+          account: variant.account,
+          port: variant.port,
+        };
+      }
+    }
+
+    return {
+      profiles,
+      cliproxy,
+    };
+  }
+
+  // Legacy mode: read config.json
+  const configPath = getConfigPath();
+
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`Config not found: ${configPath}`);
+  }
+
+  const raw = fs.readFileSync(configPath, 'utf8');
+  const parsed: unknown = JSON.parse(raw);
+
+  if (!isConfig(parsed)) {
+    throw new Error(`Invalid config format: ${configPath}`);
+  }
+
+  return parsed;
+}
+
+/**
  * Get settings path for profile.
  * In unified mode (config.yaml exists), reads from config.yaml first,
  * then falls back to config.json for backward compatibility.
@@ -106,19 +163,24 @@ export function getSettingsPath(profile: string): string {
 
     // If not found in unified config, try legacy config.json as fallback
     if (!settingsPath) {
-      try {
-        const legacyConfig = loadConfig();
-        if (legacyConfig.profiles[profile]) {
-          settingsPath = legacyConfig.profiles[profile];
-          // Merge legacy profiles into available list (avoid duplicates)
-          for (const p of Object.keys(legacyConfig.profiles)) {
-            if (!availableProfiles.includes(p)) {
-              availableProfiles.push(p);
+      // Use inline safe logic - loadConfig() calls process.exit() which cannot be caught
+      const configPath = getConfigPath();
+      if (fs.existsSync(configPath)) {
+        try {
+          const raw = fs.readFileSync(configPath, 'utf8');
+          const legacyConfig: unknown = JSON.parse(raw);
+          if (isConfig(legacyConfig) && legacyConfig.profiles[profile]) {
+            settingsPath = legacyConfig.profiles[profile];
+            // Merge legacy profiles into available list (avoid duplicates)
+            for (const p of Object.keys(legacyConfig.profiles)) {
+              if (!availableProfiles.includes(p)) {
+                availableProfiles.push(p);
+              }
             }
           }
+        } catch {
+          // Legacy config is invalid JSON - that's OK in unified mode
         }
-      } catch {
-        // Legacy config doesn't exist or is invalid - that's OK in unified mode
       }
     }
   } else {
