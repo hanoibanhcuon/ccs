@@ -112,6 +112,8 @@ class ProfileDetector {
         type: 'cliproxy',
         name: profileName,
         provider: variant.provider as CLIProxyProfileName,
+        settingsPath: variant.settings,
+        port: variant.port,
       };
     }
 
