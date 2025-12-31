@@ -41,6 +41,10 @@ export class HeadlessExecutor {
       permissionMode = 'acceptEdits',
       resumeSession = false,
       sessionId = null,
+      maxTurns,
+      fallbackModel,
+      agents,
+      betas,
       extraArgs = [],
     } = options;
 
@@ -116,7 +120,21 @@ export class HeadlessExecutor {
       args.push('--disallowedTools', ...toolRestrictions.disallowedTools);
     }
 
-    // Passthrough extra args
+    // Claude Code CLI passthrough flags (explicit, validated)
+    if (maxTurns !== undefined && maxTurns > 0) {
+      args.push('--max-turns', String(maxTurns));
+    }
+    if (fallbackModel) {
+      args.push('--fallback-model', fallbackModel);
+    }
+    if (agents) {
+      args.push('--agents', agents);
+    }
+    if (betas) {
+      args.push('--betas', betas);
+    }
+
+    // Passthrough extra args (catch-all for new/unknown flags)
     if (extraArgs.length > 0) {
       args.push(...extraArgs);
     }

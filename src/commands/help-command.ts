@@ -214,6 +214,16 @@ Run ${color('ccs config', 'command')} for web dashboard`.trim();
     ['/ccs:continue "follow-up"', 'Continue last delegation session'],
   ]);
 
+  // Delegation CLI Flags (Claude Code passthrough)
+  printSubSection('Delegation Flags (Claude Code passthrough)', [
+    ['--max-turns <n>', 'Limit agentic turns (prevents loops)'],
+    ['--fallback-model <model>', 'Auto-fallback on overload (sonnet)'],
+    ['--agents <json>', 'Inject dynamic subagents'],
+    ['--betas <features>', 'Enable experimental features'],
+    ['--allowedTools <list>', 'Restrict available tools'],
+    ['--disallowedTools <list>', 'Block specific tools'],
+  ]);
+
   // Diagnostics
   printSubSection('Diagnostics', [
     ['ccs setup', 'First-time setup wizard'],

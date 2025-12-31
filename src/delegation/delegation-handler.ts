@@ -17,7 +17,12 @@ interface ParsedArgs {
     timeout?: number;
     resumeSession?: boolean;
     sessionId?: string;
-    extraArgs?: string[]; // Passthrough args for Claude CLI
+    // Claude Code CLI passthrough flags (explicit)
+    maxTurns?: number;
+    fallbackModel?: string;
+    agents?: string;
+    betas?: string;
+    extraArgs?: string[]; // Catch-all for new/unknown flags
   };
 }
 
@@ -187,9 +192,45 @@ export class DelegationHandler {
       options.timeout = parseInt(args[timeoutIndex + 1], 10);
     }
 
+    // Parse --max-turns (limit agentic turns)
+    const maxTurnsIndex = args.indexOf('--max-turns');
+    if (maxTurnsIndex !== -1 && maxTurnsIndex < args.length - 1) {
+      const val = parseInt(args[maxTurnsIndex + 1], 10);
+      if (!isNaN(val) && val > 0) {
+        options.maxTurns = val;
+      }
+    }
+
+    // Parse --fallback-model (auto-fallback on overload)
+    const fallbackIndex = args.indexOf('--fallback-model');
+    if (fallbackIndex !== -1 && fallbackIndex < args.length - 1) {
+      options.fallbackModel = args[fallbackIndex + 1];
+    }
+
+    // Parse --agents (dynamic subagent JSON)
+    const agentsIndex = args.indexOf('--agents');
+    if (agentsIndex !== -1 && agentsIndex < args.length - 1) {
+      options.agents = args[agentsIndex + 1];
+    }
+
+    // Parse --betas (experimental features)
+    const betasIndex = args.indexOf('--betas');
+    if (betasIndex !== -1 && betasIndex < args.length - 1) {
+      options.betas = args[betasIndex + 1];
+    }
+
     // Collect extra args to pass through to Claude CLI
     // CCS-handled flags with values (skip these and their values):
-    const ccsFlagsWithValue = new Set(['-p', '--prompt', '--timeout', '--permission-mode']);
+    const ccsFlagsWithValue = new Set([
+      '-p',
+      '--prompt',
+      '--timeout',
+      '--permission-mode',
+      '--max-turns',
+      '--fallback-model',
+      '--agents',
+      '--betas',
+    ]);
     const extraArgs: string[] = [];
     const profile = this._extractProfile(args);
 
