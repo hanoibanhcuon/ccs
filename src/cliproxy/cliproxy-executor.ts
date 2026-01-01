@@ -26,6 +26,7 @@ import {
   ensureProviderSettings,
   CLIPROXY_DEFAULT_PORT,
   getCliproxyWritablePath,
+  validatePort,
 } from './config-generator';
 import { checkRemoteProxy } from './remote-proxy-client';
 import { isAuthenticated } from './auth-handler';
@@ -171,6 +172,9 @@ export async function execClaudeWithCLIProxy(
   } else if (proxyConfig.port !== CLIPROXY_DEFAULT_PORT) {
     cfg.port = proxyConfig.port;
   }
+
+  // Final port validation - ensure valid port after all resolution
+  cfg.port = validatePort(cfg.port);
 
   log(`Proxy mode: ${proxyConfig.mode}`);
   if (proxyConfig.mode === 'remote') {
