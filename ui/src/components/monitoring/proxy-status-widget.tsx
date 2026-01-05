@@ -272,7 +272,7 @@ export function ProxyStatusWidget() {
           isRunning ? 'border-green-500/30 bg-green-500/5' : 'border-muted bg-muted/30'
         )}
       >
-        {/* Header row: Status dot, title, version, update badge, icon buttons */}
+        {/* Header row: Status dot, title, icon buttons */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Status indicator */}
@@ -283,54 +283,14 @@ export function ProxyStatusWidget() {
               )}
             />
             <span className="text-sm font-medium">CLIProxy Plus</span>
-
-            {/* Version in header */}
-            {currentVersion && (
-              <span
-                className={cn(
-                  'text-xs font-mono text-muted-foreground',
-                  isUnstable && 'text-amber-600 dark:text-amber-400'
-                )}
-              >
-                v{currentVersion}
-              </span>
-            )}
-
-            {/* Clickable Update/Downgrade badge */}
-            {(hasUpdate || isUnstable) && targetVersion && (
-              <Badge
-                variant="secondary"
-                className={cn(
-                  'text-[10px] h-5 px-2 gap-1 cursor-pointer transition-colors',
-                  isUnstable
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                )}
-                onClick={() => handleInstallVersion(targetVersion)}
-                title={`Click to ${isUnstable ? 'downgrade' : 'update'}`}
-              >
-                {isUnstable ? (
-                  <>
-                    <ArrowDown className="w-2.5 h-2.5" />
-                    {targetVersion}
-                  </>
-                ) : (
-                  <>
-                    <ArrowUp className="w-2.5 h-2.5" />
-                    {targetVersion}
-                  </>
-                )}
-              </Badge>
-            )}
           </div>
 
-          {/* Right side: status icon + control buttons when running */}
+          {/* Right side: icon buttons when running */}
           <div className="flex items-center gap-1">
             {isLoading ? (
               <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
             ) : isRunning ? (
               <>
-                {/* Icon buttons: Restart, Stop, Settings/Close */}
                 <IconButton
                   icon={RotateCw}
                   tooltip="Restart"
@@ -358,6 +318,40 @@ export function ProxyStatusWidget() {
             )}
           </div>
         </div>
+
+        {/* Version row: version + update badge */}
+        {currentVersion && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <span
+              className={cn(
+                'text-xs font-mono text-muted-foreground',
+                isUnstable && 'text-amber-600 dark:text-amber-400'
+              )}
+            >
+              v{currentVersion}
+            </span>
+            {(hasUpdate || isUnstable) && targetVersion && (
+              <Badge
+                variant="secondary"
+                className={cn(
+                  'text-[10px] h-4 px-1.5 gap-0.5 cursor-pointer transition-colors',
+                  isUnstable
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
+                )}
+                onClick={() => handleInstallVersion(targetVersion)}
+                title={`Click to ${isUnstable ? 'downgrade' : 'update'}`}
+              >
+                {isUnstable ? (
+                  <ArrowDown className="w-2.5 h-2.5" />
+                ) : (
+                  <ArrowUp className="w-2.5 h-2.5" />
+                )}
+                {targetVersion}
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Stats row when running */}
         {isRunning && status && (
