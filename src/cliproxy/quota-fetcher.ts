@@ -9,7 +9,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAuthDir } from './config-generator';
 import { CLIProxyProvider } from './types';
-import { getProviderAccounts, type AccountInfo } from './account-manager';
+import {
+  getProviderAccounts,
+  setAccountTier,
+  type AccountInfo,
+  type AccountTier,
+} from './account-manager';
 
 /** Individual model quota info */
 export interface ModelQuota {
@@ -45,6 +50,8 @@ export interface QuotaResult {
   accountId?: string;
   /** GCP project ID for this account */
   projectId?: string;
+  /** Detected account tier based on model access */
+  tier?: AccountTier;
 }
 
 /** Google Cloud Code API endpoints */
@@ -102,6 +109,38 @@ interface TokenRefreshResponse {
   token_type?: string;
   error?: string;
   error_description?: string;
+}
+
+/**
+ * Detect account tier from quota API model list.
+ * Ultra accounts have access to experimental/preview models.
+ * Pro accounts have standard model access.
+ * Free/unknown accounts have limited model access.
+ */
+export function detectTier(quotaResult: QuotaResult): AccountTier {
+  if (!quotaResult.success || quotaResult.models.length === 0) {
+    return 'unknown';
+  }
+
+  const modelNames = quotaResult.models.map((m) => m.name.toLowerCase());
+
+  // Ultra indicators: experimental, preview, ultra in name
+  const ultraIndicators = ['ultra', 'experimental', 'preview', '2.5-pro', '3-ultra'];
+  const hasUltra = modelNames.some((name) =>
+    ultraIndicators.some((indicator) => name.includes(indicator))
+  );
+
+  if (hasUltra) return 'ultra';
+
+  // Pro indicators: gemini-2.0, gemini-3, pro models
+  const proIndicators = ['gemini-2', 'gemini-3', '-pro'];
+  const hasPro = modelNames.some((name) =>
+    proIndicators.some((indicator) => name.includes(indicator))
+  );
+
+  if (hasPro) return 'pro';
+
+  return 'free';
 }
 
 /** loadCodeAssist response */
@@ -522,8 +561,24 @@ export async function fetchAccountQuota(
   if (!result.success && result.error?.includes('expired') && authData.refreshToken) {
     const refreshResult = await refreshAccessToken(authData.refreshToken);
     if (refreshResult.accessToken) {
-      return fetchAvailableModels(refreshResult.accessToken, projectId);
+      const retryResult = await fetchAvailableModels(refreshResult.accessToken, projectId);
+      // Detect and persist tier for retry result
+      if (retryResult.success) {
+        const tier = detectTier(retryResult);
+        retryResult.tier = tier;
+        retryResult.accountId = accountId;
+        setAccountTier(provider, accountId, tier);
+      }
+      return retryResult;
     }
+  }
+
+  // Detect and persist tier for successful result
+  if (result.success) {
+    const tier = detectTier(result);
+    result.tier = tier;
+    result.accountId = accountId;
+    setAccountTier(provider, accountId, tier);
   }
 
   return result;
