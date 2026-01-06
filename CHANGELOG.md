@@ -1,3 +1,39 @@
+## [7.14.0](https://github.com/kaitranntt/ccs/compare/v7.13.1...v7.14.0) (2026-01-06)
+
+### Features
+
+* **agy:** add preflight quota check with auto-switch ([c85ff74](https://github.com/kaitranntt/ccs/commit/c85ff74f3cdd9b346d1d4d929c29104ab16c658f))
+* **agy:** promote gemini-claude-sonnet-4-5 as default Haiku model ([c9cdfd9](https://github.com/kaitranntt/ccs/commit/c9cdfd98792cc6d272aa22e2317a3a3bb32105de)), closes [#270](https://github.com/kaitranntt/ccs/issues/270)
+* **cliproxy:** add background token refresh worker ([f98bb24](https://github.com/kaitranntt/ccs/commit/f98bb24a98618df132857b414e30997eb3cf0b90))
+* **cliproxy:** add dashboard UI parity for version stability ([c5621da](https://github.com/kaitranntt/ccs/commit/c5621dab515ea290e2740cc1fce79e9d65081579)), closes [#269](https://github.com/kaitranntt/ccs/issues/269)
+* **cliproxy:** add doctor subcommand for quota diagnostics ([944f5c0](https://github.com/kaitranntt/ccs/commit/944f5c0fb07bcf293a164b81886595aeb8217703)), closes [#252](https://github.com/kaitranntt/ccs/issues/252)
+* **cliproxy:** add version management UI with install/restart controls ([a69b2e9](https://github.com/kaitranntt/ccs/commit/a69b2e9d109130abf8a2a99d76bf4560d64c831c))
+* **dev:** add symlink setup for testing dev version ([981cef8](https://github.com/kaitranntt/ccs/commit/981cef82119359384e7385aff1791b0afa4f4fc1))
+* **quota:** add fetchAllProviderQuotas and findAvailableAccount ([24847f5](https://github.com/kaitranntt/ccs/commit/24847f5804ca258b597b7f367750315b9abfa9f8)), closes [#252](https://github.com/kaitranntt/ccs/issues/252)
+* **ui:** add stability warning to ProxyStatusWidget ([8a56a43](https://github.com/kaitranntt/ccs/commit/8a56a43989eb26b22ba28aa091a2bcef97701a20))
+
+### Bug Fixes
+
+* **agy:** edge case handling for quota failover ([5b58bd3](https://github.com/kaitranntt/ccs/commit/5b58bd35c9e2dfd7163bc8eff7804506b49b4872))
+* **cliproxy:** add edge case handling for version capping ([212aef8](https://github.com/kaitranntt/ccs/commit/212aef81bc68a2d0d146d410d18f7778b8c2c100))
+* **cliproxy:** add missing OAuth callback ports for codex, agy, iflow ([cfe604a](https://github.com/kaitranntt/ccs/commit/cfe604a97c5ef79fbfb1f020579e0b5541d49b27))
+* **cliproxy:** cap auto-update to v80 due to v81+ context bugs ([869ab3e](https://github.com/kaitranntt/ccs/commit/869ab3eecd97de2a84c18c5ad25fe2abf0bdb088)), closes [#269](https://github.com/kaitranntt/ccs/issues/269)
+* **oauth:** add stdin keepalive to prevent blocking on manual URL prompt ([0557f93](https://github.com/kaitranntt/ccs/commit/0557f93f2fdb17972324f05c9e216785f893ad16))
+* **oauth:** harden cleanup for edge cases in auth process ([472497f](https://github.com/kaitranntt/ccs/commit/472497fb0324a92993b2a7e7fd27c8f071a9e7c6))
+* **shared-manager:** normalize plugin registry paths to canonical ~/.claude/ ([1067afb](https://github.com/kaitranntt/ccs/commit/1067afbea713625713e72c1738ef06a21bd04d62)), closes [#276](https://github.com/kaitranntt/ccs/issues/276)
+* **ui:** add missing isStable and maxStableVersion to type ([4fd4d6c](https://github.com/kaitranntt/ccs/commit/4fd4d6c264b5dbcb9f3e181b46a82090764f46c6))
+* **ui:** clean up ProxyStatusWidget layout spacing ([4f69abb](https://github.com/kaitranntt/ccs/commit/4f69abbe88fb0bd6782373b5eeebd665dfcafd4b))
+* **ui:** update/downgrade button now installs correct version ([48d4a96](https://github.com/kaitranntt/ccs/commit/48d4a96a62fecde105f58bd68ca130571ef0daa4))
+* **websearch:** use 'where' command on Windows for CLI detection ([e03d9b7](https://github.com/kaitranntt/ccs/commit/e03d9b77437575a39af0dca14c2a6b5967ae4f09)), closes [#273](https://github.com/kaitranntt/ccs/issues/273)
+
+### Documentation
+
+* **agy:** add quota management and failover documentation ([8ea1e33](https://github.com/kaitranntt/ccs/commit/8ea1e333bc2b365b7f058201f714e41e822b815f))
+
+### Code Refactoring
+
+* **ui:** redesign ProxyStatusWidget with two-state UX ([8072b93](https://github.com/kaitranntt/ccs/commit/8072b93b3b2d4bc721fece815c8edf45da67b34b))
+
 ## [7.13.1](https://github.com/kaitranntt/ccs/compare/v7.13.0...v7.13.1) (2026-01-05)
 
 ### Bug Fixes
