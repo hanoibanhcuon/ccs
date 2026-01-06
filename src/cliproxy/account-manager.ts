@@ -95,7 +95,7 @@ export function generateNickname(email?: string): string {
 
 /**
  * Validate nickname
- * Rules: 1-50 chars, any non-whitespace allowed (permissive)
+ * Rules: 1-50 chars, no whitespace, URL-safe, no reserved patterns
  * @returns null if valid, error message if invalid
  */
 export function validateNickname(nickname: string): string | null {
@@ -107,6 +107,14 @@ export function validateNickname(nickname: string): string | null {
   }
   if (/\s/.test(nickname)) {
     return 'Nickname cannot contain whitespace';
+  }
+  // Block URL-unsafe chars that break routing
+  if (/[%\/&?#]/.test(nickname)) {
+    return 'Nickname cannot contain special URL characters (%, /, &, ?, #)';
+  }
+  // Block reserved patterns used by auto-discovery (kiro-1, ghcp-2, etc.)
+  if (/^(kiro|ghcp)-\d+$/i.test(nickname)) {
+    return 'Nickname cannot match reserved pattern (kiro-N, ghcp-N)';
   }
   return null;
 }
@@ -597,7 +605,30 @@ export function discoverExistingAccounts(): void {
     }
   }
 
-  saveAccountsRegistry(registry);
+  // Reload-merge pattern: reduce race condition with concurrent OAuth registration
+  // Reload fresh registry and merge discovered accounts (fresh registry wins on conflicts)
+  const freshRegistry = loadAccountsRegistry();
+  for (const [providerName, discovered] of Object.entries(registry.providers)) {
+    if (!discovered) continue;
+    const prov = providerName as CLIProxyProvider;
+    if (!freshRegistry.providers[prov]) {
+      freshRegistry.providers[prov] = discovered;
+    } else {
+      // Merge accounts, preferring fresh registry's existing entries
+      const freshProviderAccounts = freshRegistry.providers[prov];
+      if (!freshProviderAccounts) continue;
+      for (const [id, meta] of Object.entries(discovered.accounts)) {
+        if (!freshProviderAccounts.accounts[id]) {
+          freshProviderAccounts.accounts[id] = meta;
+          // Set default if none exists
+          if (!freshProviderAccounts.default || freshProviderAccounts.default === 'default') {
+            freshProviderAccounts.default = id;
+          }
+        }
+      }
+    }
+  }
+  saveAccountsRegistry(freshRegistry);
 }
 
 /**

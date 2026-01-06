@@ -277,7 +277,9 @@ router.delete('/accounts/:provider/:accountId', (req: Request, res: Response): v
  */
 router.post('/:provider/start', async (req: Request, res: Response): Promise<void> => {
   const { provider } = req.params;
-  const { nickname, noIncognito: noIncognitoBody } = req.body;
+  const { nickname: nicknameRaw, noIncognito: noIncognitoBody } = req.body;
+  // Trim nickname for consistency with CLI (oauth-handler.ts trims input)
+  const nickname = typeof nicknameRaw === 'string' ? nicknameRaw.trim() : nicknameRaw;
 
   // Validate provider
   if (!validProviders.includes(provider as CLIProxyProvider)) {
