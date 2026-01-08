@@ -110,7 +110,15 @@ export function applyThinkingConfig(
   // Get base model to check thinking support
   const baseModel = result.ANTHROPIC_MODEL || '';
   if (!supportsThinking(provider, baseModel)) {
-    return result; // Model doesn't support thinking
+    // U2: Warn user if they explicitly provided --thinking but model doesn't support it
+    if (thinkingOverride !== undefined && thinkingConfig.show_warnings !== false) {
+      console.warn(
+        warn(
+          `Model ${baseModel || 'unknown'} (provider: ${provider}) does not support thinking budget. --thinking flag ignored.`
+        )
+      );
+    }
+    return result;
   }
 
   // Determine thinking value to use

@@ -337,14 +337,16 @@ export async function execClaudeWithCLIProxy(
   } else {
     // Fall back to --thinking value format
     const thinkingIdx = argsWithoutProxy.indexOf('--thinking');
-    if (
-      thinkingIdx !== -1 &&
-      argsWithoutProxy[thinkingIdx + 1] &&
-      // W4: Intentionally block negative numbers (negative budgets don't make sense)
-      // Values starting with '-' are treated as next flag, not a negative number
-      !argsWithoutProxy[thinkingIdx + 1].startsWith('-')
-    ) {
-      const val = argsWithoutProxy[thinkingIdx + 1];
+    if (thinkingIdx !== -1) {
+      const nextArg = argsWithoutProxy[thinkingIdx + 1];
+      // U1: Check if --thinking has a value (not missing or another flag)
+      if (!nextArg || nextArg.startsWith('-')) {
+        console.error(fail('--thinking requires a value'));
+        console.error('    Examples: --thinking low, --thinking 8192, --thinking off');
+        console.error('    Levels: minimal, low, medium, high, xhigh, auto');
+        process.exit(1);
+      }
+      const val = nextArg;
       // Parse as number if numeric, otherwise keep as string (level name)
       const numVal = parseInt(val, 10);
       thinkingOverride = !isNaN(numVal) ? numVal : val;
