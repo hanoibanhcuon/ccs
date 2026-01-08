@@ -8,6 +8,25 @@
 import { CLIProxyProvider } from './types';
 
 /**
+ * Thinking support configuration for a model.
+ * Defines how thinking/reasoning budget can be controlled.
+ */
+export interface ThinkingSupport {
+  /** Type of thinking control: 'budget' (token count), 'levels' (named levels), 'none' */
+  type: 'budget' | 'levels' | 'none';
+  /** Minimum budget tokens (for budget type) */
+  min?: number;
+  /** Maximum budget tokens (for budget type) */
+  max?: number;
+  /** Valid level names (for levels type) */
+  levels?: string[];
+  /** Whether zero/disabled thinking is allowed */
+  zeroAllowed?: boolean;
+  /** Whether dynamic/auto thinking is allowed */
+  dynamicAllowed?: boolean;
+}
+
+/**
  * Model entry definition
  */
 export interface ModelEntry {
@@ -27,6 +46,8 @@ export interface ModelEntry {
   deprecated?: boolean;
   /** Deprecation reason/message */
   deprecationReason?: string;
+  /** Thinking/reasoning support configuration */
+  thinking?: ThinkingSupport;
 }
 
 /**
@@ -54,21 +75,37 @@ export const MODEL_CATALOG: Partial<Record<CLIProxyProvider, ProviderCatalog>> =
         id: 'gemini-claude-opus-4-5-thinking',
         name: 'Claude Opus 4.5 Thinking',
         description: 'Most capable, extended thinking',
+        thinking: {
+          type: 'budget',
+          min: 1024,
+          max: 100000,
+          zeroAllowed: false,
+          dynamicAllowed: true,
+        },
       },
       {
         id: 'gemini-claude-sonnet-4-5-thinking',
         name: 'Claude Sonnet 4.5 Thinking',
         description: 'Balanced with extended thinking',
+        thinking: {
+          type: 'budget',
+          min: 1024,
+          max: 100000,
+          zeroAllowed: false,
+          dynamicAllowed: true,
+        },
       },
       {
         id: 'gemini-claude-sonnet-4-5',
         name: 'Claude Sonnet 4.5',
         description: 'Fast and capable',
+        thinking: { type: 'none' },
       },
       {
         id: 'gemini-3-pro-preview',
         name: 'Gemini 3 Pro',
         description: 'Google latest model via Antigravity',
+        thinking: { type: 'levels', levels: ['low', 'high'], dynamicAllowed: true },
       },
     ],
   },
@@ -82,11 +119,19 @@ export const MODEL_CATALOG: Partial<Record<CLIProxyProvider, ProviderCatalog>> =
         name: 'Gemini 3 Pro',
         tier: 'paid',
         description: 'Latest model, requires paid Google account',
+        thinking: { type: 'levels', levels: ['low', 'high'], dynamicAllowed: true },
       },
       {
         id: 'gemini-2.5-pro',
         name: 'Gemini 2.5 Pro',
         description: 'Stable, works with free Google account',
+        thinking: {
+          type: 'budget',
+          min: 128,
+          max: 32768,
+          zeroAllowed: false,
+          dynamicAllowed: true,
+        },
       },
     ],
   },
@@ -148,4 +193,23 @@ export function getModelDeprecationReason(
 ): string | undefined {
   const model = findModel(provider, modelId);
   return model?.deprecationReason;
+}
+
+/**
+ * Get thinking support configuration for a model
+ */
+export function getModelThinkingSupport(
+  provider: CLIProxyProvider,
+  modelId: string
+): ThinkingSupport | undefined {
+  const model = findModel(provider, modelId);
+  return model?.thinking;
+}
+
+/**
+ * Check if model supports thinking/reasoning
+ */
+export function supportsThinking(provider: CLIProxyProvider, modelId: string): boolean {
+  const thinking = getModelThinkingSupport(provider, modelId);
+  return thinking !== undefined && thinking.type !== 'none';
 }
