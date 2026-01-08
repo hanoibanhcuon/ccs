@@ -281,6 +281,20 @@ Run ${color('ccs config', 'command')} for web dashboard`.trim();
     ['--allow-self-signed', 'Allow self-signed certs (for dev proxies)'],
   ]);
 
+  // W3: Thinking Budget explanation
+  printSubSection('Extended Thinking (--thinking)', [
+    ['--thinking off', 'Disable extended thinking'],
+    ['--thinking auto', 'Let model decide dynamically'],
+    ['--thinking low', '1K tokens - Quick responses'],
+    ['--thinking medium', '8K tokens - Standard analysis'],
+    ['--thinking high', '24K tokens - Deep reasoning'],
+    ['--thinking xhigh', '32K tokens - Maximum depth'],
+    ['--thinking <number>', 'Custom token budget (512-100000)'],
+    ['', ''],
+    ['Note:', 'Extended thinking allocates compute for step-by-step reasoning'],
+    ['', 'before responding. Supported: agy, gemini (thinking models).'],
+  ]);
+
   // CLI Proxy env vars
   printSubSection('CLI Proxy Environment Variables', [
     ['CCS_PROXY_HOST', 'Remote proxy hostname'],
