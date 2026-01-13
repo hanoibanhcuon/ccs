@@ -1,3 +1,10 @@
+## [7.18.2](https://github.com/kaitranntt/ccs/compare/v7.18.1...v7.18.2) (2026-01-13)
+
+### Bug Fixes
+
+* **ci:** isolate concurrency groups by comment author ([3163509](https://github.com/kaitranntt/ccs/commit/316350905233d776968f53732974a77997513f24))
+* **ci:** isolate concurrency groups by comment author ([#322](https://github.com/kaitranntt/ccs/issues/322)) ([1d33012](https://github.com/kaitranntt/ccs/commit/1d33012b4e5ad02bac63f9b559f64c3efdf26044))
+
 ## [7.18.1](https://github.com/kaitranntt/ccs/compare/v7.18.0...v7.18.1) (2026-01-13)
 
 ### Bug Fixes
