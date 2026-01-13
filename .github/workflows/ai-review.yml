@@ -21,7 +21,8 @@ on:
         required: true
         type: string
 
-# Cancel in-progress runs for same PR (safe now since auto-trigger is only on opened)
+# Simple concurrency: one review per PR at a time
+# With track_progress disabled, no bot comments are posted during review
 concurrency:
   group: ai-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
   cancel-in-progress: true
@@ -92,7 +93,7 @@ jobs:
           anthropic_api_key: ${{ secrets.CLIPROXY_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
           path_to_claude_code_executable: /home/github-runner/.local/bin/claude
-          track_progress: ${{ github.event_name != 'workflow_dispatch' }}
+          track_progress: false  # Disabled - no progress comments, just final review
           prompt: |
             ultrathink
 
