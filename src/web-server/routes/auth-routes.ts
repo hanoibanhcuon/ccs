@@ -31,6 +31,13 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
     return;
   }
 
+  // Validate bcrypt hash format to prevent bcrypt.compare errors
+  const isBcryptHash = /^\$2[aby]?\$\d{2}\$.{53}$/.test(authConfig.password_hash);
+  if (!isBcryptHash) {
+    res.status(500).json({ error: 'Invalid password hash format in config' });
+    return;
+  }
+
   // Verify credentials
   const usernameMatch = username === authConfig.username;
   const passwordMatch = await bcrypt.compare(password, authConfig.password_hash);

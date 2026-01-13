@@ -3,7 +3,7 @@
  * Uses shadcn/ui Card and Input components.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -26,9 +26,15 @@ export function LoginPage() {
   // Get redirect destination (default to home)
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
-  // If already authenticated or auth not required, redirect
+  // Redirect if already authenticated or auth not required (via useEffect to avoid render side effects)
+  useEffect(() => {
+    if (isAuthenticated || !authRequired) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, authRequired, navigate, from]);
+
+  // Show nothing while redirecting
   if (isAuthenticated || !authRequired) {
-    navigate(from, { replace: true });
     return null;
   }
 
