@@ -639,6 +639,15 @@ export function discoverExistingAccounts(): void {
       // Skip if token file already registered (under any accountId)
       const existingTokenFiles = Object.values(providerAccounts.accounts).map((a) => a.tokenFile);
       if (existingTokenFiles.includes(file)) {
+        // Token file exists - check if we need to update projectId for agy accounts
+        if (provider === 'agy' && data.project_id) {
+          const existingEntry = Object.entries(providerAccounts.accounts).find(
+            ([, meta]) => meta.tokenFile === file
+          );
+          if (existingEntry && !existingEntry[1].projectId) {
+            existingEntry[1].projectId = data.project_id;
+          }
+        }
         continue;
       }
 
@@ -710,7 +719,7 @@ export function discoverExistingAccounts(): void {
     if (!freshRegistry.providers[prov]) {
       freshRegistry.providers[prov] = discovered;
     } else {
-      // Merge accounts, preferring fresh registry's existing entries
+      // Merge accounts, preferring fresh registry's existing entries but updating projectId
       const freshProviderAccounts = freshRegistry.providers[prov];
       if (!freshProviderAccounts) continue;
       for (const [id, meta] of Object.entries(discovered.accounts)) {
@@ -720,6 +729,9 @@ export function discoverExistingAccounts(): void {
           if (!freshProviderAccounts.default || freshProviderAccounts.default === 'default') {
             freshProviderAccounts.default = id;
           }
+        } else if (meta.projectId && !freshProviderAccounts.accounts[id].projectId) {
+          // Update existing account with projectId if discovered from auth file
+          freshProviderAccounts.accounts[id].projectId = meta.projectId;
         }
       }
     }
