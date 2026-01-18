@@ -1,5 +1,5 @@
 # AI Code Review Workflow
-# Uses anthropics/claude-code-action with CLIProxy for model flexibility
+# Uses anthropics/claude-code-action with CLIProxy (localhost:8317)
 # Posts as ccs-agy-reviewer[bot] via GitHub App
 #
 # Triggers:
@@ -69,8 +69,8 @@ jobs:
 
     # CLIProxy environment for model routing
     env:
-      REVIEW_MODEL: gemini-claude-opus-4-5-thinking
       ANTHROPIC_BASE_URL: http://localhost:8317
+      REVIEW_MODEL: gemini-claude-opus-4-5-thinking
       ANTHROPIC_AUTH_TOKEN: ccs-internal-managed
       ANTHROPIC_MODEL: gemini-claude-opus-4-5-thinking
       ANTHROPIC_DEFAULT_OPUS_MODEL: gemini-claude-opus-4-5-thinking
