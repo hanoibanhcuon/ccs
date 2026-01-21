@@ -131,7 +131,7 @@ export function SessionStatsCard({ data, isLoading, className }: SessionStatsCar
               >
                 <div className="flex flex-col min-w-0 flex-1">
                   <span className="font-medium truncate" title={session.projectPath}>
-                    {session.projectPath.split('/').pop()}
+                    {getProjectDisplayName(session.projectPath)}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
                     {formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })}
@@ -150,6 +150,17 @@ export function SessionStatsCard({ data, isLoading, className }: SessionStatsCar
       </CardContent>
     </Card>
   );
+}
+
+function getProjectDisplayName(path: string): string {
+  if (!path) return '';
+
+  // Remove leading/trailing slashes and split into segments
+  const cleanPath = path.replace(/^\/|\/$/g, '');
+  const segments = cleanPath.split('/').filter(segment => segment.length > 0);
+
+  // Return the last segment (leaf folder name)
+  return segments[segments.length - 1] || '';
 }
 
 function formatCompact(num: number): string {
