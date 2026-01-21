@@ -110,11 +110,14 @@ export default function ThinkingSection() {
             <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
             <div className="text-sm text-blue-700 dark:text-blue-300">
               <p className="font-medium">Supported Providers</p>
-              <p className="mt-1 text-blue-600 dark:text-blue-400">
-                Thinking budget works with: <strong>agy</strong> (Antigravity),{' '}
-                <strong>gemini</strong> (with thinking models). Other providers may ignore this
-                setting.
-              </p>
+              <ul className="mt-1 space-y-0.5 text-blue-600 dark:text-blue-400">
+                <li>
+                  Thinking budget: <strong>agy</strong>, <strong>gemini</strong> (token-based)
+                </li>
+                <li>
+                  Reasoning effort: <strong>codex</strong> (level-based: medium/high/xhigh)
+                </li>
+              </ul>
             </div>
           </div>
 

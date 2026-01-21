@@ -341,7 +341,7 @@ router.put('/thinking', (req: Request, res: Response): void => {
       }
     }
 
-    // C4: Validate provider_overrides if provided
+    // C4: Validate provider_overrides if provided (nested structure: Record<string, Partial<ThinkingTierDefaults>>)
     if (updates.provider_overrides !== undefined) {
       if (
         typeof updates.provider_overrides !== 'object' ||
@@ -352,18 +352,34 @@ router.put('/thinking', (req: Request, res: Response): void => {
         return;
       }
       const validLevels = [...VALID_THINKING_LEVELS] as string[];
-      for (const [provider, level] of Object.entries(updates.provider_overrides)) {
+      const validTiers = ['opus', 'sonnet', 'haiku'];
+      for (const [provider, tierOverrides] of Object.entries(updates.provider_overrides)) {
         if (typeof provider !== 'string' || provider.trim() === '') {
           res
             .status(400)
             .json({ error: 'Invalid provider_overrides: keys must be non-empty strings' });
           return;
         }
-        if (typeof level !== 'string' || !validLevels.includes(level)) {
+        // tierOverrides should be Partial<ThinkingTierDefaults>
+        if (typeof tierOverrides !== 'object' || tierOverrides === null) {
           res.status(400).json({
-            error: `Invalid level for provider ${provider}: must be one of ${validLevels.join(', ')}`,
+            error: `Invalid provider_overrides for ${provider}: must be an object with tier→level mapping`,
           });
           return;
+        }
+        for (const [tier, level] of Object.entries(tierOverrides)) {
+          if (!validTiers.includes(tier)) {
+            res.status(400).json({
+              error: `Invalid tier '${tier}' in provider_overrides.${provider}: must be one of ${validTiers.join(', ')}`,
+            });
+            return;
+          }
+          if (typeof level !== 'string' || !validLevels.includes(level)) {
+            res.status(400).json({
+              error: `Invalid level for provider_overrides.${provider}.${tier}: must be one of ${validLevels.join(', ')}`,
+            });
+            return;
+          }
         }
       }
     }

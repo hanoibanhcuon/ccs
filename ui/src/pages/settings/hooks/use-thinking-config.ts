@@ -141,13 +141,6 @@ export function useThinkingConfig() {
     [saveConfig]
   );
 
-  const setManualOverride = useCallback(
-    (value: string | number | undefined) => {
-      saveConfig({ mode: 'manual', override: value });
-    },
-    [saveConfig]
-  );
-
   return {
     config: config || DEFAULT_THINKING_CONFIG,
     loading,
@@ -159,6 +152,5 @@ export function useThinkingConfig() {
     setMode,
     setTierDefault,
     setShowWarnings,
-    setManualOverride,
   };
 }

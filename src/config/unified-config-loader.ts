@@ -470,6 +470,25 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     lines.push('');
   }
 
+  // Thinking section (extended thinking/reasoning configuration)
+  if (config.thinking) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Thinking: Extended thinking/reasoning budget configuration');
+    lines.push('# Controls reasoning depth for supported providers (agy, gemini, codex).');
+    lines.push('#');
+    lines.push('# Modes: auto (use tier_defaults), off (disable), manual (--thinking flag only)');
+    lines.push('# Levels: minimal (512), low (1K), medium (8K), high (24K), xhigh (32K), auto');
+    lines.push('# Override: Set global override value (number or level name)');
+    lines.push('# Provider overrides: Per-provider tier defaults');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml
+        .dump({ thinking: config.thinking }, { indent: 2, lineWidth: -1, quotingType: '"' })
+        .trim()
+    );
+    lines.push('');
+  }
+
   // Dashboard auth section (only if configured)
   if (config.dashboard_auth?.enabled) {
     lines.push('# ----------------------------------------------------------------------------');

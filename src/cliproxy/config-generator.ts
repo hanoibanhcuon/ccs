@@ -25,6 +25,14 @@ import { supportsThinking } from './model-catalog';
 import { ThinkingConfig } from '../config/unified-config-types';
 import { validateThinking } from './thinking-validator';
 
+/**
+ * Check if warnings should be shown based on thinking config.
+ * Defaults to true if show_warnings is not explicitly false.
+ */
+function shouldShowWarnings(thinkingConfig: ThinkingConfig): boolean {
+  return thinkingConfig.show_warnings !== false;
+}
+
 /** Settings file structure for user overrides */
 interface ProviderSettings {
   env: NodeJS.ProcessEnv;
@@ -54,14 +62,11 @@ export function detectTierFromModel(modelName: string): ModelTier {
  * @param model - Base model name
  * @param thinkingValue - Level name (e.g., 'high') or numeric budget
  * @returns Model name with thinking suffix, e.g., "gemini-3-pro-preview(high)"
- *
- * @note Paren matching only handles one level. Nested parens like "model(foo)(8192)"
- *       will be treated as already having suffix and returned unchanged.
  */
 export function applyThinkingSuffix(model: string, thinkingValue: string | number): string {
-  // Don't apply if already has suffix
-  // NOTE: This only detects ANY paren pair, not proper nesting (e.g., "model(foo)(8192)" passes through)
-  if (model.includes('(') && model.includes(')')) {
+  // Don't apply if model already ends with a parenthesized suffix (e.g., "model(high)" or "model(8192)")
+  // Matches: ends with "(...)" where content is non-empty
+  if (/\([^)]+\)$/.test(model)) {
     return model;
   }
   return `${model}(${thinkingValue})`;
@@ -111,7 +116,7 @@ export function applyThinkingConfig(
   const baseModel = result.ANTHROPIC_MODEL || '';
   if (!supportsThinking(provider, baseModel)) {
     // U2: Warn user if they explicitly provided --thinking but model doesn't support it
-    if (thinkingOverride !== undefined && thinkingConfig.show_warnings !== false) {
+    if (thinkingOverride !== undefined && shouldShowWarnings(thinkingConfig)) {
       console.warn(
         warn(
           `Model ${baseModel || 'unknown'} (provider: ${provider}) does not support thinking budget. --thinking flag ignored.`
@@ -140,7 +145,7 @@ export function applyThinkingConfig(
 
   // Validate thinking value against model capabilities
   const validation = validateThinking(provider, baseModel, thinkingValue);
-  if (validation.warning && thinkingConfig.show_warnings !== false) {
+  if (validation.warning && shouldShowWarnings(thinkingConfig)) {
     console.warn(warn(validation.warning));
   }
   thinkingValue = validation.value;
