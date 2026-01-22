@@ -44,6 +44,22 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     apiKeyHint: 'Get your API key at openrouter.ai/keys',
     category: 'recommended',
   },
+  // Recommended - Ollama (Local)
+  {
+    id: 'ollama',
+    name: 'Ollama (Local)',
+    description: 'Local open-source models via Ollama (32K+ context)',
+    baseUrl: 'http://localhost:11434',
+    defaultProfileName: 'ollama',
+    badge: 'Local',
+    featured: true,
+    icon: '/icons/ollama.svg',
+    defaultModel: 'qwen3-coder',
+    requiresApiKey: false,
+    apiKeyPlaceholder: '',
+    apiKeyHint: 'No API key required for local Ollama',
+    category: 'recommended',
+  },
   // Alternative providers - GLM/GLMT/Kimi
   {
     id: 'glm',
@@ -134,6 +150,20 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     requiresApiKey: true,
     apiKeyPlaceholder: 'sk-...',
     apiKeyHint: 'Get your API key from Alibaba Cloud Model Studio',
+    category: 'alternative',
+  },
+  {
+    id: 'ollama-cloud',
+    name: 'Ollama Cloud',
+    description: 'Ollama cloud models via direct API (glm-4.7:cloud, minimax-m2.1:cloud)',
+    baseUrl: 'https://ollama.com',
+    defaultProfileName: 'ollama-cloud',
+    badge: 'Cloud',
+    icon: '/icons/ollama.svg',
+    defaultModel: 'glm-4.7:cloud',
+    requiresApiKey: true,
+    apiKeyPlaceholder: 'YOUR_OLLAMA_CLOUD_API_KEY',
+    apiKeyHint: 'Get your API key at ollama.com',
     category: 'alternative',
   },
 ];
