@@ -17,6 +17,8 @@ export interface ProviderPreset {
   apiKeyPlaceholder: string;
   apiKeyHint: string;
   category: PresetCategory;
+  /** Whether API key is required (false for local providers like Ollama) */
+  requiresApiKey?: boolean;
   /** Additional env vars for thinking mode, etc. */
   extraEnv?: Record<string, string>;
   /** Enable always thinking mode */
@@ -42,6 +44,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     apiKeyPlaceholder: 'sk-or-...',
     apiKeyHint: 'Get your API key at openrouter.ai/keys',
     category: 'recommended',
+    requiresApiKey: true,
   },
   {
     id: 'ollama',
@@ -53,6 +56,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     apiKeyPlaceholder: 'ollama',
     apiKeyHint: 'Install Ollama from ollama.com - no API key needed for local',
     category: 'recommended',
+    requiresApiKey: false,
   },
   // Alternative providers
   {
@@ -152,6 +156,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     apiKeyPlaceholder: 'YOUR_OLLAMA_CLOUD_API_KEY',
     apiKeyHint: 'Get your API key at ollama.com',
     category: 'alternative',
+    requiresApiKey: true,
   },
 ];
 
