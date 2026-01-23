@@ -19,9 +19,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useProxyConfig, useRawConfig } from '../../hooks';
-import { useUpdateBackend } from '@/hooks/use-cliproxy';
+import { useUpdateBackend, useProxyStatus } from '@/hooks/use-cliproxy';
 import { LocalProxyCard } from './local-proxy-card';
 import { RemoteProxyCard } from './remote-proxy-card';
+import { ProxyStatusWidget } from '@/components/monitoring/proxy-status-widget';
 import { api } from '@/lib/api-client';
 
 /** LocalStorage key for debug mode preference */
@@ -78,6 +79,8 @@ export default function ProxySection() {
   const [backend, setBackend] = useState<'original' | 'plus'>('plus');
   const [hasKiroGhcpVariants, setHasKiroGhcpVariants] = useState(false);
   const updateBackendMutation = useUpdateBackend();
+  const { data: proxyStatus } = useProxyStatus();
+  const isProxyRunning = proxyStatus?.running ?? false;
 
   // Fetch backend setting
   const fetchBackend = useCallback(async () => {
@@ -253,6 +256,14 @@ export default function ProxySection() {
             for proxy-based profiles
           </p>
 
+          {/* Proxy Status Widget - Quick access to start/stop controls */}
+          {!isRemoteMode && (
+            <div className="space-y-3">
+              <h3 className="text-base font-medium">Instance Status</h3>
+              <ProxyStatusWidget />
+            </div>
+          )}
+
           {/* Mode Toggle - Card based selection */}
           <div className="space-y-3">
             <h3 className="text-base font-medium">Connection Mode</h3>
@@ -307,16 +318,25 @@ export default function ProxySection() {
               <Box className="w-4 h-4" />
               Backend Binary
             </h3>
+            {/* Warning when proxy is running - must stop to change backend */}
+            {isProxyRunning && (
+              <Alert className="py-2 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/20">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-700 dark:text-amber-400">
+                  Stop the running proxy above to switch backend binary.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-2 gap-3">
               {/* Plus Backend Card */}
               <button
                 onClick={() => handleBackendChange('plus')}
-                disabled={updateBackendMutation.isPending}
+                disabled={updateBackendMutation.isPending || isProxyRunning}
                 className={`p-4 rounded-lg border-2 text-left transition-all ${
                   backend === 'plus'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-muted-foreground/50'
-                }`}
+                } ${isProxyRunning ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center gap-3 mb-2">
                   <span className="font-medium">CLIProxyAPIPlus</span>
@@ -332,12 +352,12 @@ export default function ProxySection() {
               {/* Original Backend Card */}
               <button
                 onClick={() => handleBackendChange('original')}
-                disabled={updateBackendMutation.isPending}
+                disabled={updateBackendMutation.isPending || isProxyRunning}
                 className={`p-4 rounded-lg border-2 text-left transition-all ${
                   backend === 'original'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-muted-foreground/50'
-                }`}
+                } ${isProxyRunning ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center gap-3 mb-2">
                   <span className="font-medium">CLIProxyAPI</span>
