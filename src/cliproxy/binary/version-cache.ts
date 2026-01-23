@@ -12,6 +12,8 @@ import {
   VERSION_PIN_FILE,
   VersionListCache,
 } from './types';
+import { DEFAULT_BACKEND } from '../platform-detector';
+import type { CLIProxyBackend } from '../types';
 
 /**
  * Get path to version cache file
@@ -21,10 +23,10 @@ export function getVersionCachePath(): string {
 }
 
 /**
- * Get path to version pin file
+ * Get path to version pin file (backend-specific)
  */
-export function getVersionPinPath(): string {
-  return path.join(getBinDir(), VERSION_PIN_FILE);
+export function getVersionPinPath(backend: CLIProxyBackend = DEFAULT_BACKEND): string {
+  return path.join(getBinDir(), backend, VERSION_PIN_FILE);
 }
 
 /**
@@ -98,10 +100,10 @@ export function writeInstalledVersion(binPath: string, version: string): void {
 }
 
 /**
- * Get pinned version if one exists
+ * Get pinned version if one exists (backend-specific)
  */
-export function getPinnedVersion(): string | null {
-  const pinPath = getVersionPinPath();
+export function getPinnedVersion(backend: CLIProxyBackend = DEFAULT_BACKEND): string | null {
+  const pinPath = getVersionPinPath(backend);
   if (!fs.existsSync(pinPath)) {
     return null;
   }
@@ -113,10 +115,13 @@ export function getPinnedVersion(): string | null {
 }
 
 /**
- * Save pinned version to persist user's explicit choice
+ * Save pinned version to persist user's explicit choice (backend-specific)
  */
-export function savePinnedVersion(version: string): void {
-  const pinPath = getVersionPinPath();
+export function savePinnedVersion(
+  version: string,
+  backend: CLIProxyBackend = DEFAULT_BACKEND
+): void {
+  const pinPath = getVersionPinPath(backend);
   try {
     fs.mkdirSync(path.dirname(pinPath), { recursive: true });
     fs.writeFileSync(pinPath, version, 'utf8');
@@ -126,10 +131,10 @@ export function savePinnedVersion(version: string): void {
 }
 
 /**
- * Clear pinned version (unpin)
+ * Clear pinned version (unpin) - backend-specific
  */
-export function clearPinnedVersion(): void {
-  const pinPath = getVersionPinPath();
+export function clearPinnedVersion(backend: CLIProxyBackend = DEFAULT_BACKEND): void {
+  const pinPath = getVersionPinPath(backend);
   if (fs.existsSync(pinPath)) {
     try {
       fs.unlinkSync(pinPath);
@@ -140,10 +145,32 @@ export function clearPinnedVersion(): void {
 }
 
 /**
- * Check if a version is currently pinned
+ * Check if a version is currently pinned (backend-specific)
  */
-export function isVersionPinned(): boolean {
-  return getPinnedVersion() !== null;
+export function isVersionPinned(backend: CLIProxyBackend = DEFAULT_BACKEND): boolean {
+  return getPinnedVersion(backend) !== null;
+}
+
+/**
+ * Migrate old shared version pin to backend-specific location.
+ * Called once on first run after update.
+ */
+export function migrateVersionPin(backend: CLIProxyBackend): void {
+  const oldPinPath = path.join(getBinDir(), VERSION_PIN_FILE);
+  if (!fs.existsSync(oldPinPath)) return;
+
+  try {
+    const oldVersion = fs.readFileSync(oldPinPath, 'utf8').trim();
+    if (!oldVersion) return;
+
+    // Save to new backend-specific location
+    savePinnedVersion(oldVersion, backend);
+
+    // Delete old shared file
+    fs.unlinkSync(oldPinPath);
+  } catch {
+    // Silent fail - not critical
+  }
 }
 
 // ==================== Version List Cache ====================

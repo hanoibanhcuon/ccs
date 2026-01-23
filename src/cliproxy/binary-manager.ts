@@ -26,9 +26,10 @@ import {
   getVersionPinPath,
   readInstalledVersion,
   ensureBinary,
+  migrateVersionPin,
 } from './binary';
 
-type CLIProxyBackend = 'original' | 'plus';
+import type { CLIProxyBackend } from './types';
 
 /**
  * Get backend from config or default to 'plus'
@@ -111,7 +112,11 @@ export class BinaryManager {
 /** Convenience function respecting version pin */
 export async function ensureCLIProxyBinary(verbose = false): Promise<string> {
   const backend = getConfiguredBackend();
-  const pinnedVersion = getPinnedVersion();
+
+  // Migrate old shared pin to backend-specific location (one-time migration)
+  migrateVersionPin(backend);
+
+  const pinnedVersion = getPinnedVersion(backend);
   if (pinnedVersion) {
     if (verbose) console.error(`[cliproxy] Using pinned version: ${pinnedVersion}`);
     return new BinaryManager(
@@ -127,27 +132,34 @@ export async function ensureCLIProxyBinary(verbose = false): Promise<string> {
 }
 
 /** Check if CLIProxyAPI binary is installed */
-export function isCLIProxyInstalled(): boolean {
-  const backend = getConfiguredBackend();
-  return new BinaryManager({}, backend).isBinaryInstalled();
+export function isCLIProxyInstalled(backend?: CLIProxyBackend): boolean {
+  const effectiveBackend = backend ?? getConfiguredBackend();
+  return new BinaryManager({}, effectiveBackend).isBinaryInstalled();
 }
 
 /** Get CLIProxyAPI binary path (may not exist) */
-export function getCLIProxyPath(): string {
-  const backend = getConfiguredBackend();
-  return new BinaryManager({}, backend).getBinaryPath();
+export function getCLIProxyPath(backend?: CLIProxyBackend): string {
+  const effectiveBackend = backend ?? getConfiguredBackend();
+  return new BinaryManager({}, effectiveBackend).getBinaryPath();
 }
 
 /** Get installed CLIProxyAPI version from .version file */
-export function getInstalledCliproxyVersion(): string {
-  const backend = getConfiguredBackend();
-  return readInstalledVersion(getBackendBinDir(backend), BACKEND_CONFIG[backend].fallbackVersion);
+export function getInstalledCliproxyVersion(backend?: CLIProxyBackend): string {
+  const effectiveBackend = backend ?? getConfiguredBackend();
+  return readInstalledVersion(
+    getBackendBinDir(effectiveBackend),
+    BACKEND_CONFIG[effectiveBackend].fallbackVersion
+  );
 }
 
 /** Install a specific version of CLIProxyAPI */
-export async function installCliproxyVersion(version: string, verbose = false): Promise<void> {
-  const backend = getConfiguredBackend();
-  const manager = new BinaryManager({ version, verbose, forceVersion: true }, backend);
+export async function installCliproxyVersion(
+  version: string,
+  verbose = false,
+  backend?: CLIProxyBackend
+): Promise<void> {
+  const effectiveBackend = backend ?? getConfiguredBackend();
+  const manager = new BinaryManager({ version, verbose, forceVersion: true }, effectiveBackend);
 
   // Check if proxy is running and stop it first
   if (isProxyRunning()) {
@@ -165,8 +177,11 @@ export async function installCliproxyVersion(version: string, verbose = false): 
   }
 
   if (manager.isBinaryInstalled()) {
+    const label = effectiveBackend === 'plus' ? 'CLIProxy Plus' : 'CLIProxy';
     if (verbose)
-      console.log(info(`Removing existing CLIProxy Plus v${getInstalledCliproxyVersion()}`));
+      console.log(
+        info(`Removing existing ${label} v${getInstalledCliproxyVersion(effectiveBackend)}`)
+      );
     manager.deleteBinary();
   }
   await manager.ensureBinary();
@@ -223,6 +238,7 @@ export {
   savePinnedVersion,
   clearPinnedVersion,
   isVersionPinned,
+  migrateVersionPin,
 };
 
 export default BinaryManager;
