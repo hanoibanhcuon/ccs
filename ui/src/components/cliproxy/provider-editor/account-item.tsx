@@ -370,7 +370,7 @@ export function AccountItem({
                                     {m.displayName}
                                   </span>
                                   <span className={cn('font-mono', m.exhausted && 'text-red-500')}>
-                                    {m.exhausted ? 'Exhausted' : `${m.percentage}%`}
+                                    {m.percentage}%
                                   </span>
                                 </div>
                               ))}
