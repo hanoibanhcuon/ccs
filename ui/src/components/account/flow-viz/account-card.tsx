@@ -231,7 +231,7 @@ export function AccountCard({
                         if (!models || models.length === 0) return null;
                         return (
                           <div key={tier} className="space-y-0.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold border-b border-border/30 pb-0.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/50 pb-0.5">
                               {getTierLabel(tier)}
                             </div>
                             {models.map((m) => (
