@@ -2,7 +2,9 @@
 /**
  * CCS Postuninstall Script
  *
- * Cleans up WebSearch hook from ~/.claude/settings.json after npm uninstall.
+ * Cleans up CCS-specific files after npm uninstall.
+ * Does NOT touch global ~/.claude/settings.json (hooks are per-profile now).
+ *
  * Self-contained, no external dependencies.
  */
 
@@ -10,51 +12,29 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
+const CCS_DIR = path.join(os.homedir(), '.ccs');
+const HOOKS_DIR = path.join(CCS_DIR, 'hooks');
+const MIGRATION_MARKER = path.join(CCS_DIR, '.hook-migrated');
 
-function cleanupHook() {
+function cleanupCcsFiles() {
   try {
-    if (!fs.existsSync(SETTINGS_PATH)) {
-      return; // Nothing to clean
+    // Remove WebSearch hook file
+    const hookPath = path.join(HOOKS_DIR, 'websearch-transformer.cjs');
+    if (fs.existsSync(hookPath)) {
+      fs.unlinkSync(hookPath);
     }
 
-    const content = fs.readFileSync(SETTINGS_PATH, 'utf8');
-    let settings;
-    try {
-      settings = JSON.parse(content);
-    } catch {
-      return; // Malformed JSON, don't touch
+    // Remove migration marker (so fresh install re-runs migration)
+    if (fs.existsSync(MIGRATION_MARKER)) {
+      fs.unlinkSync(MIGRATION_MARKER);
     }
 
-    const hooks = settings.hooks;
-    if (!hooks?.PreToolUse) {
-      return; // No hooks to remove
-    }
-
-    const originalLength = hooks.PreToolUse.length;
-    hooks.PreToolUse = hooks.PreToolUse.filter((h) => {
-      if (h.matcher !== 'WebSearch') return true;
-      const command = h.hooks?.[0]?.command;
-      if (!command) return true;
-      return !command.includes('.ccs/hooks/websearch-transformer');
-    });
-
-    if (hooks.PreToolUse.length === originalLength) {
-      return; // Nothing changed
-    }
-
-    // Clean up empty structures
-    if (hooks.PreToolUse.length === 0) {
-      delete hooks.PreToolUse;
-    }
-    if (Object.keys(hooks).length === 0) {
-      delete settings.hooks;
-    }
-
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf8');
+    // Note: Do NOT touch ~/.claude/settings.json
+    // Per-profile hooks in ~/.ccs/*.settings.json will be cleaned up
+    // when the user removes ~/.ccs/ directory.
   } catch {
     // Silent fail - not critical
   }
 }
 
-cleanupHook();
+cleanupCcsFiles();

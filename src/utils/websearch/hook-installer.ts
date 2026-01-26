@@ -11,7 +11,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { info, warn } from '../ui';
 import { getWebSearchConfig } from '../../config/unified-config-loader';
-import { getHookPath, ensureHookConfig, removeHookConfig } from './hook-config';
+import { getHookPath, ensureHookConfig } from './hook-config';
+import { removeMigrationMarker } from './profile-hook-injector';
 
 // Re-export from hook-config for backward compatibility
 export { getHookPath, getWebSearchHookConfig } from './hook-config';
@@ -102,6 +103,9 @@ export function installWebSearchHook(): boolean {
 /**
  * Uninstall WebSearch hook from ~/.ccs/hooks/
  *
+ * Note: Does NOT touch global ~/.claude/settings.json.
+ * Profile-specific hooks are removed when ~/.ccs/ is deleted.
+ *
  * @returns true if hook uninstalled successfully
  */
 export function uninstallWebSearchHook(): boolean {
@@ -115,8 +119,11 @@ export function uninstallWebSearchHook(): boolean {
       }
     }
 
-    // Remove from settings.json
-    removeHookConfig();
+    // Remove migration marker (so fresh install re-runs migration)
+    removeMigrationMarker();
+
+    // Note: Do NOT call removeHookConfig() - global settings should not be touched.
+    // Per-profile hooks in ~/.ccs/*.settings.json are cleaned up when ~/.ccs/ is deleted.
 
     return true;
   } catch (error) {
