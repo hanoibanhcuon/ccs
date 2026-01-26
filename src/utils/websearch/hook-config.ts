@@ -178,3 +178,66 @@ export function ensureHookConfig(): boolean {
     return false;
   }
 }
+
+/**
+ * Remove CCS WebSearch hook from ~/.claude/settings.json
+ * Only removes hooks matching: matcher='WebSearch' AND command contains '.ccs/hooks/websearch-transformer'
+ * Preserves user-defined WebSearch hooks
+ */
+export function removeHookConfig(): boolean {
+  try {
+    if (!fs.existsSync(CLAUDE_SETTINGS_PATH)) {
+      return true; // Nothing to remove
+    }
+
+    const content = fs.readFileSync(CLAUDE_SETTINGS_PATH, 'utf8');
+    let settings: Record<string, unknown>;
+    try {
+      settings = JSON.parse(content);
+    } catch {
+      return false; // Malformed JSON, don't touch
+    }
+
+    const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+    if (!hooks?.PreToolUse) {
+      return true; // No hooks to remove
+    }
+
+    const originalLength = hooks.PreToolUse.length;
+    hooks.PreToolUse = hooks.PreToolUse.filter((h: unknown) => {
+      const hook = h as Record<string, unknown>;
+      if (hook.matcher !== 'WebSearch') return true; // Keep non-WebSearch hooks
+
+      const hookArray = hook.hooks as Array<Record<string, unknown>> | undefined;
+      if (!hookArray?.[0]?.command) return true; // Keep malformed entries
+
+      const command = hookArray[0].command as string;
+      return !command.includes('.ccs/hooks/websearch-transformer'); // Remove if CCS hook
+    });
+
+    if (hooks.PreToolUse.length === originalLength) {
+      return true; // Nothing changed
+    }
+
+    // Clean up empty hooks object
+    if (hooks.PreToolUse.length === 0) {
+      delete hooks.PreToolUse;
+    }
+    if (Object.keys(hooks).length === 0) {
+      delete settings.hooks;
+    }
+
+    fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf8');
+
+    if (process.env.CCS_DEBUG) {
+      console.error(info('Removed WebSearch hook from settings.json'));
+    }
+
+    return true;
+  } catch (error) {
+    if (process.env.CCS_DEBUG) {
+      console.error(warn(`Failed to remove hook config: ${(error as Error).message}`));
+    }
+    return false;
+  }
+}

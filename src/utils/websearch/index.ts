@@ -41,6 +41,9 @@ export {
   uninstallWebSearchHook,
 } from './hook-installer';
 
+// Hook Config (removal)
+export { removeHookConfig } from './hook-config';
+
 // Hook Environment
 export { getWebSearchHookEnv } from './hook-env';
 
