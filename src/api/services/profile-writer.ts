@@ -3,7 +3,6 @@
  * Supports both unified YAML config and legacy JSON config.
  */
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { getCcsDir, getConfigPath, loadConfigSafe } from '../../utils/config-manager';
 import { expandPath } from '../../utils/helpers';
@@ -83,7 +82,7 @@ function createApiProfileUnified(
   apiKey: string,
   models: ModelMapping
 ): void {
-  const ccsDir = path.join(os.homedir(), '.ccs');
+  const ccsDir = getCcsDir();
   const settingsFile = `${name}.settings.json`;
   const settingsPath = path.join(ccsDir, settingsFile);
 
