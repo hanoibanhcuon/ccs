@@ -55,3 +55,6 @@ export {
   getWebSearchReadiness,
   displayWebSearchStatus,
 } from './status';
+
+// Profile Hook Injection
+export { ensureProfileHooks, removeMigrationMarker } from './profile-hook-injector';
