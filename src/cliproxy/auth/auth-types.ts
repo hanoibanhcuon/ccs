@@ -127,7 +127,7 @@ export const OAUTH_CONFIGS: Record<CLIProxyProvider, ProviderOAuthConfig> = {
     displayName: 'Claude (Anthropic)',
     authUrl: 'https://console.anthropic.com/oauth/authorize',
     scopes: ['user:inference', 'user:profile'],
-    authFlag: '--anthropic-login',
+    authFlag: '--claude-login',
   },
 };
 
