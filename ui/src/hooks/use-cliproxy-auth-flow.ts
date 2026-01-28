@@ -14,7 +14,7 @@ interface AuthFlowState {
   error: string | null;
 }
 
-const VALID_PROVIDERS = ['gemini', 'codex', 'agy', 'qwen', 'iflow', 'kiro', 'ghcp'];
+const VALID_PROVIDERS = ['gemini', 'codex', 'agy', 'qwen', 'iflow', 'kiro', 'ghcp', 'claude'];
 
 export function useCliproxyAuthFlow() {
   const [state, setState] = useState<AuthFlowState>({

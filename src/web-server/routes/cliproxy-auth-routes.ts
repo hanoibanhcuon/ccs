@@ -71,6 +71,8 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
       iflow: 'iflow',
       kiro: 'kiro',
       copilot: 'ghcp', // CLIProxyAPI returns 'copilot', we map to 'ghcp'
+      anthropic: 'claude', // CLIProxyAPI returns 'anthropic', we map to 'claude'
+      claude: 'claude',
     };
 
     // Update lastUsedAt for providers with recent activity

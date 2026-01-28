@@ -47,7 +47,7 @@ export interface UpdateProfile {
 
 export interface Variant {
   name: string;
-  provider: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp';
+  provider: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp' | 'claude';
   settings: string;
   account?: string;
   port?: number;
@@ -56,13 +56,13 @@ export interface Variant {
 
 export interface CreateVariant {
   name: string;
-  provider: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp';
+  provider: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp' | 'claude';
   model?: string;
   account?: string;
 }
 
 export interface UpdateVariant {
-  provider?: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp';
+  provider?: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp' | 'claude';
   model?: string;
   account?: string;
 }
@@ -72,7 +72,7 @@ export interface OAuthAccount {
   id: string;
   email?: string;
   nickname?: string;
-  provider: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp';
+  provider: 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow' | 'kiro' | 'ghcp' | 'claude';
   isDefault: boolean;
   tokenFile: string;
   createdAt: string;

@@ -136,7 +136,15 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
     try {
       await createMutation.mutateAsync({
         name: variantName,
-        provider: selectedProvider as 'gemini' | 'codex' | 'agy' | 'qwen' | 'iflow',
+        provider: selectedProvider as
+          | 'gemini'
+          | 'codex'
+          | 'agy'
+          | 'qwen'
+          | 'iflow'
+          | 'kiro'
+          | 'ghcp'
+          | 'claude',
         model: modelName || undefined,
         account: selectedAccount?.id,
       });
