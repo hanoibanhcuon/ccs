@@ -22,6 +22,7 @@ import {
   useCancelAuth,
 } from '@/hooks/use-cliproxy';
 import type { AuthStatus, OAuthAccount } from '@/lib/api-client';
+import type { CLIProxyProvider } from '@/lib/provider-config';
 import { applyDefaultPreset } from '@/lib/preset-utils';
 import { usePrivacy } from '@/contexts/privacy-context';
 import { toast } from 'sonner';
@@ -136,15 +137,7 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
     try {
       await createMutation.mutateAsync({
         name: variantName,
-        provider: selectedProvider as
-          | 'gemini'
-          | 'codex'
-          | 'agy'
-          | 'qwen'
-          | 'iflow'
-          | 'kiro'
-          | 'ghcp'
-          | 'claude',
+        provider: selectedProvider as CLIProxyProvider,
         model: modelName || undefined,
         account: selectedAccount?.id,
       });
