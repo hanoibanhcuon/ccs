@@ -1,3 +1,29 @@
+## [7.29.0](https://github.com/kaitranntt/ccs/compare/v7.28.2...v7.29.0) (2026-01-28)
+
+### Features
+
+* **cliproxy:** add Claude (Anthropic) OAuth provider support ([28d8bd8](https://github.com/kaitranntt/ccs/commit/28d8bd84a5ac912b79416aeced95f74fd71876bb)), closes [#380](https://github.com/kaitranntt/ccs/issues/380)
+* skip local OAuth when using remote proxy with auth token ([1f5d119](https://github.com/kaitranntt/ccs/commit/1f5d11930ee19c0f00b46d7994ea99c7be8e55c6))
+
+### Bug Fixes
+
+* add claude provider to statsProviderMap, UI types, and provider arrays ([4a2abc7](https://github.com/kaitranntt/ccs/commit/4a2abc74cac93e17ee12fab3fcf8fc0693552347))
+* **cliproxy:** add Claude to all provider lists for sidebar display ([d212995](https://github.com/kaitranntt/ccs/commit/d2129957d7e954701be973725545f475711d0468))
+* **cliproxy:** address PR review feedback ([2091a90](https://github.com/kaitranntt/ccs/commit/2091a90b7710e7cb0b565577a5e659473126a541)), closes [#D97757](https://github.com/kaitranntt/ccs/issues/D97757)
+* **cliproxy:** improve skip-local-auth edge case handling ([21e819b](https://github.com/kaitranntt/ccs/commit/21e819b59062b77c2686ecc5f24e9c3436e42f84))
+* **cliproxy:** use correct --claude-login flag for Claude OAuth ([8017ce8](https://github.com/kaitranntt/ccs/commit/8017ce8f8639ffc282203d6809091df83e0c8f18)), closes [#382](https://github.com/kaitranntt/ccs/issues/382)
+* replace hardcoded provider validation arrays with CLIPROXY_PROFILES import ([9cd9c42](https://github.com/kaitranntt/ccs/commit/9cd9c423e929579c86da3f409d74927c3c7dedc1)), closes [#382](https://github.com/kaitranntt/ccs/issues/382)
+* **test:** use correct provider name 'ghcp' instead of 'copilot' ([838cd1d](https://github.com/kaitranntt/ccs/commit/838cd1d460de68acb571bb44bc12f91bd0636ff7))
+* **ui:** add iFlow to PROVIDER_ASSETS + sync validation test ([5c62e06](https://github.com/kaitranntt/ccs/commit/5c62e06d0236b5080ccfb3ca2ff55407cbb414e1)), closes [#384](https://github.com/kaitranntt/ccs/issues/384)
+* **ui:** truncate long account emails in provider editor ([a9c5520](https://github.com/kaitranntt/ccs/commit/a9c5520b8b4b7d49d1afe0e63b4facab3142db1b))
+
+### Code Refactoring
+
+* **cliproxy:** reorder providers - Antigravity first, then Claude ([b385ab1](https://github.com/kaitranntt/ccs/commit/b385ab131d2b179c7b7bd014859f9118afd6ce5c))
+* **cliproxy:** use CLIPROXY_PROFILES for provider arrays (DRY) ([9fd9395](https://github.com/kaitranntt/ccs/commit/9fd93955880fd1b90d15f45d9738d413d04769ca)), closes [#384](https://github.com/kaitranntt/ccs/issues/384)
+* **oauth:** derive auth-code providers from OAUTH_FLOW_TYPES (DRY) ([c713d48](https://github.com/kaitranntt/ccs/commit/c713d48d08af5044cb0fab4505365fd98e31b9d6)), closes [#384](https://github.com/kaitranntt/ccs/issues/384)
+* **ui:** centralize provider list in provider-config.ts (DRY) ([5a4c8e0](https://github.com/kaitranntt/ccs/commit/5a4c8e009ce1cc355d6fa2f05001cab6c9b684c4))
+
 ## [7.28.2](https://github.com/kaitranntt/ccs/compare/v7.28.1...v7.28.2) (2026-01-27)
 
 ### Bug Fixes
