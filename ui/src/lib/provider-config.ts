@@ -24,7 +24,7 @@ export const PROVIDER_COLORS: Record<string, string> = {
   qwen: '#6236FF',
   kiro: '#4d908e', // Dark Cyan (AWS-inspired)
   ghcp: '#43aa8b', // Seaweed (GitHub-inspired)
-  claude: '#D97706', // Anthropic orange
+  claude: '#D97757', // Anthropic brand color (matches SVG)
 };
 
 // Provider display names

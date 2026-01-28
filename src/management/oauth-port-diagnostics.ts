@@ -164,7 +164,7 @@ export async function checkAllOAuthPorts(): Promise<OAuthPortDiagnostic[]> {
  * Check OAuth ports for providers that use Authorization Code flow only
  */
 export async function checkAuthCodePorts(): Promise<OAuthPortDiagnostic[]> {
-  const providers: CLIProxyProvider[] = ['gemini', 'codex', 'agy', 'kiro', 'claude'];
+  const providers: CLIProxyProvider[] = ['gemini', 'codex', 'agy', 'iflow', 'kiro', 'claude'];
   const results: OAuthPortDiagnostic[] = [];
 
   for (const provider of providers) {
