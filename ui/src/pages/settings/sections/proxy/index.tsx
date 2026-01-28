@@ -29,7 +29,7 @@ import { api } from '@/lib/api-client';
 const DEBUG_MODE_KEY = 'ccs_debug_mode';
 
 /** Providers only available on CLIProxyAPIPlus */
-const PLUS_ONLY_PROVIDERS = ['kiro', 'ghcp'];
+const PLUS_ONLY_PROVIDERS = ['kiro', 'ghcp', 'claude'];
 
 export default function ProxySection() {
   const {
