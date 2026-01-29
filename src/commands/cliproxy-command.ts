@@ -1002,7 +1002,7 @@ async function handleQuotaStatus(
 
   // Display Antigravity section
   if (agyResults && agyResults.accounts.length > 0) {
-    displayAntigravityQuotaSection(agyResults, verbose);
+    displayAntigravityQuotaSection(agyResults);
   } else if (shouldFetch.agy) {
     console.log(subheader('Antigravity (0 accounts)'));
     console.log(info('No Antigravity accounts configured'));
@@ -1035,8 +1035,7 @@ async function handleQuotaStatus(
  * Display Antigravity quota section
  */
 function displayAntigravityQuotaSection(
-  quotaResult: Awaited<ReturnType<typeof fetchAllProviderQuotas>>,
-  _verbose: boolean
+  quotaResult: Awaited<ReturnType<typeof fetchAllProviderQuotas>>
 ): void {
   const provider: CLIProxyProvider = 'agy';
   const accounts = getProviderAccounts(provider);

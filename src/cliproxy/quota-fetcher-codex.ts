@@ -9,12 +9,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAuthDir } from './config-generator';
 import { getProviderAccounts, getPausedDir } from './account-manager';
+import { sanitizeEmail, isTokenExpired } from './auth-utils';
 import type { CodexQuotaResult, CodexQuotaWindow } from './quota-types';
 
 /** ChatGPT backend API base URL */
 const CODEX_API_BASE = 'https://chatgpt.com/backend-api';
 
-/** User agent matching Codex CLI */
+/**
+ * User agent matching Codex CLI for API compatibility.
+ * Update when Codex CLI releases new versions to maintain compatibility.
+ */
 const USER_AGENT = 'codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal';
 
 /** Auth data extracted from Codex auth file */
@@ -49,26 +53,6 @@ interface CodexWindowData {
   usedPercent?: number;
   reset_after_seconds?: number | null;
   resetAfterSeconds?: number | null;
-}
-
-/**
- * Sanitize email to match CLIProxyAPI auth file naming convention
- */
-function sanitizeEmail(email: string): string {
-  return email.replace(/@/g, '_').replace(/\./g, '_');
-}
-
-/**
- * Check if token is expired based on the expired timestamp
- */
-function isTokenExpired(expiredStr?: string): boolean {
-  if (!expiredStr) return false;
-  try {
-    const expiredDate = new Date(expiredStr);
-    return expiredDate.getTime() < Date.now();
-  } catch {
-    return false;
-  }
 }
 
 /**

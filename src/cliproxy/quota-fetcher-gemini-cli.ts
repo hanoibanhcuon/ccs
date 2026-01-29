@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAuthDir } from './config-generator';
 import { getProviderAccounts, getPausedDir } from './account-manager';
+import { sanitizeEmail, isTokenExpired } from './auth-utils';
 import type { GeminiCliQuotaResult, GeminiCliBucket } from './quota-types';
 
 /** Google Cloud Code API endpoints */
@@ -79,26 +80,6 @@ function resolveGeminiCliProjectId(accountField: string): string | null {
     lastMatch = match[1];
   }
   return lastMatch;
-}
-
-/**
- * Sanitize email to match CLIProxyAPI auth file naming convention
- */
-function sanitizeEmail(email: string): string {
-  return email.replace(/@/g, '_').replace(/\./g, '_');
-}
-
-/**
- * Check if token is expired based on the expired timestamp
- */
-function isTokenExpired(expiredStr?: string): boolean {
-  if (!expiredStr) return false;
-  try {
-    const expiredDate = new Date(expiredStr);
-    return expiredDate.getTime() < Date.now();
-  } catch {
-    return false;
-  }
 }
 
 /**
