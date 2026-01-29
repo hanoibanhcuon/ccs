@@ -1,3 +1,22 @@
+## [7.31.0](https://github.com/kaitranntt/ccs/compare/v7.30.1...v7.31.0) (2026-01-29)
+
+### Features
+
+* **cliproxy:** add multi-provider quota display for Codex and Gemini CLI ([30e611f](https://github.com/kaitranntt/ccs/commit/30e611fc28e10f89d6aabb2cdbf9450d6ce748a1))
+
+### Bug Fixes
+
+* **cliproxy:** resolve regex escape bug and complete DRY refactor ([38ba6a9](https://github.com/kaitranntt/ccs/commit/38ba6a9fea564d3c48a083e6594c2c6e5cc82b20)), closes [#395](https://github.com/kaitranntt/ccs/issues/395)
+* **config:** add missing base-claude.settings.json ([643232f](https://github.com/kaitranntt/ccs/commit/643232f58e4a1954553f761cbad9863dab3133fa))
+
+### Code Refactoring
+
+* **cliproxy:** extract shared auth utils and remove unused parameter ([e31d00f](https://github.com/kaitranntt/ccs/commit/e31d00f0b99f51bd8768d351b2b38604d221935b)), closes [#395](https://github.com/kaitranntt/ccs/issues/395)
+
+### Tests
+
+* **cliproxy:** add unit tests for quota fetchers and auth utilities ([ad8327d](https://github.com/kaitranntt/ccs/commit/ad8327d17e8182d71f0c784e2ef6db30cb3877bb)), closes [#395](https://github.com/kaitranntt/ccs/issues/395)
+
 ## [7.30.1](https://github.com/kaitranntt/ccs/compare/v7.30.0...v7.30.1) (2026-01-29)
 
 ### Bug Fixes
