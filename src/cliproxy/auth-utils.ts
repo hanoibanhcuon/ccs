@@ -9,7 +9,7 @@
  * Replaces @ and . with underscores for filesystem compatibility.
  */
 export function sanitizeEmail(email: string): string {
-  return email.replace(/@/g, '_').replace(/\\./g, '_');
+  return email.replace(/@/g, '_').replace(/\./g, '_');
 }
 
 /**

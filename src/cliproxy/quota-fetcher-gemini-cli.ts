@@ -16,7 +16,10 @@ import type { GeminiCliQuotaResult, GeminiCliBucket } from './quota-types';
 const GEMINI_CLI_API_BASE = 'https://cloudcode-pa.googleapis.com';
 const GEMINI_CLI_API_VERSION = 'v1internal';
 
-/** Model groups for quota consolidation */
+/**
+ * Model groups for quota consolidation.
+ * Update when Google releases new Gemini models to include them in quota display.
+ */
 const GEMINI_CLI_GROUPS: Record<
   string,
   {

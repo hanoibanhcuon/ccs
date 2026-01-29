@@ -5,8 +5,6 @@
  * Supports Antigravity, Codex, and Gemini CLI providers.
  */
 
-import type { QuotaResult as AntigravityQuotaResult } from './quota-fetcher';
-
 /** Supported quota providers */
 export type QuotaProvider = 'agy' | 'codex' | 'gemini';
 
@@ -83,27 +81,4 @@ export interface GeminiCliQuotaResult {
   error?: string;
   /** Account ID (email) this quota belongs to */
   accountId?: string;
-}
-
-/**
- * Unified quota result wrapper for CLI/Dashboard
- * Contains provider-specific data in nested fields
- */
-export interface UnifiedQuotaResult {
-  /** Provider this result belongs to */
-  provider: QuotaProvider;
-  /** Whether fetch succeeded */
-  success: boolean;
-  /** Timestamp of fetch */
-  lastUpdated: number;
-  /** Error message if fetch failed */
-  error?: string;
-  /** Account ID (email) this quota belongs to */
-  accountId?: string;
-  /** Antigravity-specific quota data */
-  antigravity?: AntigravityQuotaResult;
-  /** Codex-specific quota data */
-  codex?: CodexQuotaResult;
-  /** Gemini CLI-specific quota data */
-  geminiCli?: GeminiCliQuotaResult;
 }
