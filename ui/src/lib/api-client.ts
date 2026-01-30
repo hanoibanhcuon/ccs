@@ -144,6 +144,8 @@ export interface QuotaResult {
   isForbidden?: boolean;
   /** Error message if fetch failed */
   error?: string;
+  /** True if token is expired and needs re-authentication */
+  needsReauth?: boolean;
 }
 
 /** Codex rate limit window */
