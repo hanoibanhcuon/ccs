@@ -1,3 +1,22 @@
+## [7.32.0](https://github.com/kaitranntt/ccs/compare/v7.31.1...v7.32.0) (2026-01-30)
+
+### Features
+
+* **cliproxy:** add ToolSanitizationProxy for Gemini 64-char limit ([6363350](https://github.com/kaitranntt/ccs/commit/63633507d2eeeff7c76b73481894dd9f1148ba93)), closes [#219](https://github.com/kaitranntt/ccs/issues/219)
+
+### Bug Fixes
+
+* **cliproxy:** address PR [#399](https://github.com/kaitranntt/ccs/issues/399) review suggestions ([98b7f6f](https://github.com/kaitranntt/ccs/commit/98b7f6f4545daca18b3c76619bd7c6a6496cc1ed))
+* **cliproxy:** route proxy logs to file instead of stderr ([4d292c6](https://github.com/kaitranntt/ccs/commit/4d292c62e46497411b8e151fe96e3e335a5be1c3))
+
+### Code Refactoring
+
+* **cliproxy:** address PR review suggestions ([d86c531](https://github.com/kaitranntt/ccs/commit/d86c53146ad7302600ad803faf0649391fa8f4e1))
+
+### Tests
+
+* **cliproxy:** add integration tests for ToolSanitizationProxy ([bf19002](https://github.com/kaitranntt/ccs/commit/bf190024f6d3b322ff945655fe65af665181a779))
+
 ## [7.31.1](https://github.com/kaitranntt/ccs/compare/v7.31.0...v7.31.1) (2026-01-29)
 
 ### Bug Fixes
