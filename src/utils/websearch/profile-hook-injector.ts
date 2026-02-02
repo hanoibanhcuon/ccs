@@ -39,7 +39,8 @@ function hasCcsHook(settings: Record<string, unknown>): boolean {
     const hookArray = hook.hooks as Array<Record<string, unknown>> | undefined;
     if (!hookArray?.[0]?.command) return false;
 
-    const command = hookArray[0].command as string;
+    const command = hookArray[0].command;
+    if (typeof command !== 'string') return false;
     // Normalize path separators for cross-platform matching (Windows uses backslashes)
     const normalizedCommand = command.replace(/\\/g, '/');
     return normalizedCommand.includes('.ccs/hooks/websearch-transformer');
@@ -55,7 +56,8 @@ function isCcsWebSearchHook(hook: Record<string, unknown>): boolean {
   const hookArray = hook.hooks as Array<Record<string, unknown>> | undefined;
   if (!hookArray?.[0]?.command) return false;
 
-  const command = hookArray[0].command as string;
+  const command = hookArray[0].command;
+  if (typeof command !== 'string') return false;
   // Normalize path separators for cross-platform matching (Windows uses backslashes)
   const normalizedCommand = command.replace(/\\/g, '/');
   return normalizedCommand.includes('.ccs/hooks/websearch-transformer');
@@ -240,7 +242,8 @@ function updateHookTimeoutIfNeeded(
       const hookArray = hook.hooks as Array<Record<string, unknown>>;
       if (!hookArray?.[0]?.command) continue;
 
-      const command = hookArray[0].command as string;
+      const command = hookArray[0].command;
+      if (typeof command !== 'string') continue;
       // Normalize path separators for cross-platform matching (Windows uses backslashes)
       const normalizedCommand = command.replace(/\\/g, '/');
       if (!normalizedCommand.includes('.ccs/hooks/websearch-transformer')) continue;

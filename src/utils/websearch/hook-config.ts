@@ -52,6 +52,47 @@ export function getHookPath(): string {
 }
 
 /**
+ * Check if a hook entry is a CCS WebSearch hook
+ */
+function isCcsWebSearchHook(hook: Record<string, unknown>): boolean {
+  if (hook.matcher !== 'WebSearch') return false;
+
+  const hookArray = hook.hooks as Array<Record<string, unknown>> | undefined;
+  if (!hookArray?.[0]?.command) return false;
+
+  const command = hookArray[0].command;
+  if (typeof command !== 'string') return false;
+  // Normalize path separators for cross-platform matching (Windows uses backslashes)
+  const normalizedCommand = command.replace(/\\/g, '/');
+  return normalizedCommand.includes('.ccs/hooks/websearch-transformer');
+}
+
+/**
+ * Remove duplicate CCS WebSearch hooks from settings, keeping only the first one
+ * Returns true if duplicates were removed
+ */
+function deduplicateCcsHooks(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks?.PreToolUse) return false;
+
+  let foundFirst = false;
+  const originalLength = hooks.PreToolUse.length;
+
+  hooks.PreToolUse = hooks.PreToolUse.filter((h: unknown) => {
+    const hook = h as Record<string, unknown>;
+    if (!isCcsWebSearchHook(hook)) return true; // Keep non-CCS hooks
+
+    if (!foundFirst) {
+      foundFirst = true;
+      return true; // Keep first CCS hook
+    }
+    return false; // Remove subsequent duplicates
+  });
+
+  return hooks.PreToolUse.length < originalLength;
+}
+
+/**
  * Get WebSearch hook configuration for settings.json
  * Timeout is computed from max provider timeout in config.yaml + buffer
  */
@@ -123,11 +164,27 @@ export function ensureHookConfig(): boolean {
     if (hooks?.PreToolUse) {
       const webSearchHookIndex = hooks.PreToolUse.findIndex((h: unknown) => {
         const hook = h as Record<string, unknown>;
-        return hook.matcher === 'WebSearch';
+        if (hook.matcher !== 'WebSearch') return false;
+
+        const hookArray = hook.hooks as Array<Record<string, unknown>> | undefined;
+        const command = hookArray?.[0]?.command;
+        if (typeof command !== 'string') return false;
+
+        const normalized = command.replace(/\\/g, '/');
+        return normalized.includes('.ccs/hooks/websearch-transformer');
       });
 
       if (webSearchHookIndex !== -1) {
-        // Hook exists - check if it needs updating
+        // Hook exists - first clean up any duplicates
+        const hadDuplicates = deduplicateCcsHooks(settings);
+        if (hadDuplicates) {
+          fs.writeFileSync(getClaudeSettingsPath(), JSON.stringify(settings, null, 2), 'utf8');
+          if (process.env.CCS_DEBUG) {
+            console.error(info('Removed duplicate WebSearch hooks from settings.json'));
+          }
+        }
+
+        // Then check if it needs updating
         const existingHook = hooks.PreToolUse[webSearchHookIndex] as Record<string, unknown>;
         const existingHooks = existingHook.hooks as Array<Record<string, unknown>>;
         const currentHookConfig = getWebSearchHookConfig();
@@ -169,6 +226,12 @@ export function ensureHookConfig(): boolean {
     if (!settingsHooks.PreToolUse) {
       settingsHooks.PreToolUse = [];
     }
+
+    // Remove any existing CCS hooks first to prevent duplicates
+    settingsHooks.PreToolUse = settingsHooks.PreToolUse.filter((h: unknown) => {
+      const hook = h as Record<string, unknown>;
+      return !isCcsWebSearchHook(hook);
+    });
 
     // Add our hook config
     const preToolUseHooks = hookConfig.PreToolUse as unknown[];
