@@ -25,8 +25,8 @@ export function getImageAnalysisHookEnv(profileName?: string): Record<string, st
 
   return {
     CCS_IMAGE_ANALYSIS_ENABLED: config.enabled ? '1' : '0',
-    CCS_IMAGE_ANALYSIS_MODEL: config.model,
-    CCS_IMAGE_ANALYSIS_TIMEOUT: config.timeout.toString(),
+    CCS_IMAGE_ANALYSIS_MODEL: config.model || 'gemini-2.5-flash',
+    CCS_IMAGE_ANALYSIS_TIMEOUT: String(Number(config.timeout) || 60),
     CCS_IMAGE_ANALYSIS_PROVIDERS: config.providers.join(','),
     CCS_IMAGE_ANALYSIS_SKIP: skipImageAnalysis ? '1' : '0',
   };
