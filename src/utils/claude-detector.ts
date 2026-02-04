@@ -4,34 +4,32 @@ import { expandPath } from './helpers';
 import { ClaudeCliInfo } from '../types';
 
 /**
- * Common Windows installation paths for Claude CLI native installer
- * These are checked as fallback when 'where.exe claude' fails
+ * Windows installation paths for Claude CLI
+ * Checked as fallback when 'where.exe claude' fails
+ *
+ * Priority order:
+ * 1. Native installer path (irm https://claude.ai/install.ps1 | iex)
+ * 2. npm/bun global install locations
  */
 const WINDOWS_NATIVE_PATHS = [
-  // Native installer locations (Anthropic/Claude branded)
-  '%LOCALAPPDATA%\\Programs\\Claude\\claude.exe',
-  '%LOCALAPPDATA%\\AnthropicClaude\\claude.exe',
-  '%PROGRAMFILES%\\Claude\\claude.exe',
-  '%PROGRAMFILES%\\Anthropic\\Claude\\claude.exe',
+  // Native installer location (confirmed from Claude's install.ps1)
+  // Source: https://github.com/anthropics/claude-code/issues/18183
+  '%USERPROFILE%\\.local\\bin\\claude.exe',
   // npm/bun global install locations (already in PATH, but check as fallback)
   '%APPDATA%\\npm\\claude.cmd',
   '%USERPROFILE%\\.bun\\bin\\claude.exe',
 ];
 
 /**
- * Expand Windows environment variables in path
- */
-function expandWindowsPath(p: string): string {
-  return p.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
-}
-
-/**
  * Check common Windows installation paths for Claude CLI
  * Returns the first valid path found, or null
+ *
+ * Note: Uses expandPath() from helpers which handles %VAR% expansion on Windows.
+ * This function is only called when isWindows is true (see detectClaudeCli).
  */
 function findClaudeInWindowsPaths(): string | null {
   for (const template of WINDOWS_NATIVE_PATHS) {
-    const expanded = expandWindowsPath(template);
+    const expanded = expandPath(template);
     if (fs.existsSync(expanded)) {
       return expanded;
     }
