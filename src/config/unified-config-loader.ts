@@ -30,6 +30,8 @@ import { isUnifiedConfigEnabled } from './feature-flags';
 
 const CONFIG_YAML = 'config.yaml';
 const CONFIG_JSON = 'config.json';
+const CONFIG_LOCK = 'config.yaml.lock';
+const LOCK_STALE_MS = 5000; // Lock is stale after 5 seconds
 
 /**
  * Get path to unified config.yaml
@@ -43,6 +45,71 @@ export function getConfigYamlPath(): string {
  */
 export function getConfigJsonPath(): string {
   return path.join(getCcsDir(), CONFIG_JSON);
+}
+
+/**
+ * Get path to config lockfile
+ */
+function getLockFilePath(): string {
+  return path.join(getCcsDir(), CONFIG_LOCK);
+}
+
+/**
+ * Acquire lockfile for config write operations.
+ * Returns true if lock acquired, false if already locked by another process.
+ * Cleans up stale locks (older than LOCK_STALE_MS).
+ */
+
+function acquireLock(): boolean {
+  const lockPath = getLockFilePath();
+  const lockData = `${process.pid}\n${Date.now()}`;
+
+  try {
+    // Check if lock exists
+    if (fs.existsSync(lockPath)) {
+      const content = fs.readFileSync(lockPath, 'utf8');
+      const [pidStr, timestampStr] = content.trim().split('\n');
+      const timestamp = parseInt(timestampStr, 10);
+
+      // Check if lock is stale
+      if (Date.now() - timestamp > LOCK_STALE_MS) {
+        // Stale lock - remove and acquire
+        fs.unlinkSync(lockPath);
+      } else {
+        // Check if process still exists
+        try {
+          process.kill(parseInt(pidStr, 10), 0); // Signal 0 checks if process exists
+          // Process exists - lock is valid
+          return false;
+        } catch {
+          // Process doesn't exist - remove stale lock
+          fs.unlinkSync(lockPath);
+        }
+      }
+    }
+
+    // Acquire lock
+    fs.writeFileSync(lockPath, lockData, { mode: 0o600 });
+    return true;
+  } catch {
+    // Lock acquisition failed
+    return false;
+  }
+}
+
+/**
+ * Release lockfile after config write operation.
+ */
+
+function releaseLock(): void {
+  const lockPath = getLockFilePath();
+  try {
+    if (fs.existsSync(lockPath)) {
+      fs.unlinkSync(lockPath);
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
 }
 
 /**
@@ -105,8 +172,9 @@ export function loadUnifiedConfig(): UnifiedConfig | null {
           console.error(`[i] Config upgraded to v${UNIFIED_CONFIG_VERSION}`);
         }
         return upgraded;
-      } catch {
-        // Ignore save errors during upgrade - config still works
+      } catch (saveError) {
+        console.error('[!] Config upgrade failed to save:', (saveError as Error).message);
+        // Continue using the upgraded version in-memory even if save fails
       }
     }
 
@@ -559,39 +627,72 @@ function generateYamlWithComments(config: UnifiedConfig): string {
 /**
  * Save unified config to YAML file.
  * Uses atomic write (temp file + rename) to prevent corruption.
+ * Uses lockfile to prevent concurrent writes.
  */
 export function saveUnifiedConfig(config: UnifiedConfig): void {
   const yamlPath = getConfigYamlPath();
   const dir = path.dirname(yamlPath);
 
-  // Ensure directory exists
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // Acquire lock (retry for up to 1 second)
+  const maxRetries = 10;
+  const retryDelayMs = 100;
+  let lockAcquired = false;
+  for (let i = 0; i < maxRetries; i++) {
+    if (acquireLock()) {
+      lockAcquired = true;
+      break;
+    }
+    // Wait before retry
+    const start = Date.now();
+    while (Date.now() - start < retryDelayMs) {
+      // Busy wait
+    }
   }
 
-  // Ensure version is set
-  config.version = UNIFIED_CONFIG_VERSION;
-
-  // Generate YAML with section comments
-  const yamlContent = generateYamlWithComments(config);
-  const content = generateYamlHeader() + yamlContent;
-
-  // Atomic write: write to temp file, then rename
-  const tempPath = `${yamlPath}.tmp.${process.pid}`;
+  if (!lockAcquired) {
+    throw new Error('Config file is locked by another process. Wait a moment and try again.');
+  }
 
   try {
-    fs.writeFileSync(tempPath, content, { mode: 0o600 });
-    fs.renameSync(tempPath, yamlPath);
-  } catch (err) {
-    // Clean up temp file on error
-    if (fs.existsSync(tempPath)) {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {
-        // Ignore cleanup errors
-      }
+    // Ensure directory exists
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     }
-    throw err;
+
+    // Ensure version is set
+    config.version = UNIFIED_CONFIG_VERSION;
+
+    // Generate YAML with section comments
+    const yamlContent = generateYamlWithComments(config);
+    const content = generateYamlHeader() + yamlContent;
+
+    // Atomic write: write to temp file, then rename
+    const tempPath = `${yamlPath}.tmp.${process.pid}`;
+
+    try {
+      fs.writeFileSync(tempPath, content, { mode: 0o600 });
+      fs.renameSync(tempPath, yamlPath);
+    } catch (error) {
+      // Clean up temp file on error
+      if (fs.existsSync(tempPath)) {
+        try {
+          fs.unlinkSync(tempPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+      // Classify filesystem errors
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === 'ENOSPC') {
+        throw new Error('Disk full - cannot save config. Free up space and try again.');
+      } else if (err.code === 'EROFS' || err.code === 'EACCES') {
+        throw new Error(`Cannot write config - check file permissions: ${err.message}`);
+      }
+      throw error;
+    }
+  } finally {
+    // Always release lock
+    releaseLock();
   }
 }
 

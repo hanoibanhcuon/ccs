@@ -130,7 +130,9 @@ function showStatus(forceReload = false): void {
           provider as keyof typeof DEFAULT_IMAGE_ANALYSIS_CONFIG.provider_models
         ] === model;
       const suffix = isDefault ? dim(' (default)') : '';
-      console.log(`  ${color(provider.padEnd(10), 'command')} ${model}${suffix}`);
+      // Edge case #3: Long model name truncation
+      const truncatedModel = model.length > 40 ? model.slice(0, 37) + '...' : model;
+      console.log(`  ${color(provider.padEnd(10), 'command')} ${truncatedModel}${suffix}`);
     }
   }
   console.log('');
@@ -156,6 +158,12 @@ export async function handleConfigImageAnalysisCommand(args: string[]): Promise<
   if (options.help) {
     showHelp();
     return;
+  }
+
+  // Validate conflicting flags (Edge case #2: --enable + --disable conflict)
+  if (options.enable && options.disable) {
+    console.error(fail('Cannot use --enable and --disable together'));
+    process.exit(1);
   }
 
   // Apply changes if any options provided
@@ -185,9 +193,15 @@ export async function handleConfigImageAnalysisCommand(args: string[]): Promise<
       console.error(info(`Valid providers: ${validProviders.join(', ')}`));
       process.exit(1);
     }
+    // Validate model name (Edge case #1: Empty model string validation)
+    const model = options.setModel.model;
+    if (!model || model.trim() === '') {
+      console.error(fail('Model name cannot be empty'));
+      process.exit(1);
+    }
     imageConfig.provider_models = {
       ...imageConfig.provider_models,
-      [options.setModel.provider]: options.setModel.model,
+      [options.setModel.provider]: model,
     };
     hasChanges = true;
   }
