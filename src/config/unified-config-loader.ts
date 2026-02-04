@@ -529,6 +529,30 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     lines.push('');
   }
 
+  // Image analysis section
+  if (config.image_analysis) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Image Analysis: Vision-based analysis for images and PDFs');
+    lines.push('# Routes Read tool requests for images/PDFs through CLIProxy vision API.');
+    lines.push('#');
+    lines.push('# When enabled: Image files trigger vision analysis instead of raw file read');
+    lines.push('# Provider models: Vision model used for each CLIProxy provider');
+    lines.push('# Timeout: Maximum seconds to wait for analysis (10-600)');
+    lines.push('#');
+    lines.push('# Supported formats: .jpg, .jpeg, .png, .gif, .webp, .heic, .bmp, .tiff, .pdf');
+    lines.push('# Configure via: ccs config image-analysis');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml
+        .dump(
+          { image_analysis: config.image_analysis },
+          { indent: 2, lineWidth: -1, quotingType: '"' }
+        )
+        .trim()
+    );
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 
