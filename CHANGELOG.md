@@ -1,3 +1,27 @@
+## [7.37.0](https://github.com/kaitranntt/ccs/compare/v7.36.0...v7.37.0) (2026-02-05)
+
+### Features
+
+* **oauth:** add interactive mode prompt for VPS/headless environments ([7a1b4d6](https://github.com/kaitranntt/ccs/commit/7a1b4d6f20176957892e217979062ba542e90343)), closes [#461](https://github.com/kaitranntt/ccs/issues/461)
+* **oauth:** add interactive mode prompt for VPS/headless environments ([#462](https://github.com/kaitranntt/ccs/issues/462)) ([2777202](https://github.com/kaitranntt/ccs/commit/2777202caa37db8c48f116ad256a3c183bb7eb1c)), closes [#461](https://github.com/kaitranntt/ccs/issues/461)
+
+### Bug Fixes
+
+* **auth:** show command checks unified config for accounts ([0e140f8](https://github.com/kaitranntt/ccs/commit/0e140f83e40e1f21b3c52504e85639c90435e61e)), closes [#458](https://github.com/kaitranntt/ccs/issues/458)
+* **cliproxy:** add NO_PROXY support and error handling for proxy URLs ([bcde5f4](https://github.com/kaitranntt/ccs/commit/bcde5f4878731d45f4867d52300dcca623e0915f))
+* **cliproxy:** respect http_proxy env vars for binary downloads ([9c527b7](https://github.com/kaitranntt/ccs/commit/9c527b7d1501deb9aefff6ab95debb18adee87f0)), closes [#266](https://github.com/kaitranntt/ccs/issues/266)
+* **cliproxy:** sanitize MCP tool input_schema to remove non-standard properties ([#459](https://github.com/kaitranntt/ccs/issues/459)) ([f8c179f](https://github.com/kaitranntt/ccs/commit/f8c179f6da47f6a0d0cb65fe3be12ea44a05bdef)), closes [#456](https://github.com/kaitranntt/ccs/issues/456)
+* **dashboard:** delete accounts from unified config mode ([8d5f7d2](https://github.com/kaitranntt/ccs/commit/8d5f7d2d8365bc8b02d3c0b72c4945673580b090)), closes [#455](https://github.com/kaitranntt/ccs/issues/455)
+* **doctor:** use cmd.exe compatible quoting for Windows shell execution ([ff92c66](https://github.com/kaitranntt/ccs/commit/ff92c66b64cb902e6faf9cc54f2973a96d29173a))
+* **shell:** escape ! for cmd.exe delayed expansion ([61bc54a](https://github.com/kaitranntt/ccs/commit/61bc54af0504d21bdf1e6a7e29dcf9ef322b89c7))
+* **shell:** escape cmd.exe special chars (%, ^, newlines) ([ed91f21](https://github.com/kaitranntt/ccs/commit/ed91f21994a3aa35a9e40539015676466b794144))
+* **ui:** allow backend switching in remote mode ([28e776d](https://github.com/kaitranntt/ccs/commit/28e776d58e7b738a7fbedacb5385c0c423196cea)), closes [#463](https://github.com/kaitranntt/ccs/issues/463)
+
+### Tests
+
+* **cliproxy:** add comprehensive proxy support unit tests ([713ee93](https://github.com/kaitranntt/ccs/commit/713ee936065d6b1f7f61a9aa07282c5f82d81774))
+* **shell:** add unit tests for escapeShellArg ([48aa3cc](https://github.com/kaitranntt/ccs/commit/48aa3cca30b2c5e7ff0b5faff865918759b048d1))
+
 ## [7.36.0](https://github.com/kaitranntt/ccs/compare/v7.35.1...v7.36.0) (2026-02-04)
 
 ### Features
